@@ -284,9 +284,10 @@ footer a { color: var(--accent2); text-decoration: none; }
 }
 .charts-fullscreen .fs-body {
   flex: 1; display: flex; flex-direction: column; overflow: hidden;
+  min-height: 0;
 }
-.charts-fullscreen .fs-price { flex: 1; min-height: 0; position: relative; }
-.charts-fullscreen .fs-comp  { height: 35%; min-height: 160px; position: relative; border-top: 1px solid var(--border); }
+.charts-fullscreen .fs-price { position: relative; overflow: hidden; }
+.charts-fullscreen .fs-comp  { position: relative; overflow: hidden; }
 .fs-exit-btn {
   padding: 4px 14px; border-radius: 6px; cursor: pointer;
   font-size: 12px; font-weight: 600;
@@ -294,6 +295,21 @@ footer a { color: var(--accent2); text-decoration: none; }
   border: 1px solid var(--border); transition: all 0.2s;
 }
 .fs-exit-btn:hover { background: var(--bg4); color: var(--fg); }
+
+/* ── Splitter handle ── */
+.fs-splitter {
+  height: 6px; flex-shrink: 0; cursor: row-resize;
+  background: var(--border); position: relative;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s;
+  z-index: 5;
+}
+.fs-splitter:hover, .fs-splitter.active { background: var(--accent); }
+.fs-splitter::after {
+  content: ''; width: 32px; height: 2px; border-radius: 1px;
+  background: var(--fg3);
+}
+.fs-splitter:hover::after, .fs-splitter.active::after { background: #000; }
 
 /* ── TradingView-style chart legend overlay ── */
 .chart-box { position: relative; }
@@ -713,9 +729,10 @@ function createPriceChart(container, data) {
   container.innerHTML = '';
 
   const ct = getChartTheme();
+  const chartH = container.clientHeight || 320;
   const chart = LightweightCharts.createChart(container, {
     width: container.clientWidth,
-    height: 320,
+    height: chartH,
     layout: { background: { color: ct.bg }, textColor: ct.text, fontSize: 11 },
     grid: { vertLines: { color: ct.grid }, horzLines: { color: ct.grid } },
     crosshair: {
@@ -827,7 +844,7 @@ function createPriceChart(container, data) {
 
   chart.timeScale().fitContent();
   new ResizeObserver(() => {
-    chart.applyOptions({ width: container.clientWidth });
+    chart.applyOptions({ width: container.clientWidth, height: container.clientHeight || 320 });
   }).observe(container);
 }
 
@@ -844,9 +861,10 @@ function createCompChart(container, data) {
   container.innerHTML = '';
 
   const ct = getChartTheme();
+  const chartH = container.clientHeight || 280;
   const chart = LightweightCharts.createChart(container, {
     width: container.clientWidth,
-    height: 280,
+    height: chartH,
     layout: { background: { color: ct.bg }, textColor: ct.text, fontSize: 11 },
     grid: { vertLines: { color: ct.grid }, horzLines: { color: ct.grid } },
     crosshair: {
@@ -958,7 +976,7 @@ function createCompChart(container, data) {
 
   chart.timeScale().fitContent();
   new ResizeObserver(() => {
-    chart.applyOptions({ width: container.clientWidth });
+    chart.applyOptions({ width: container.clientWidth, height: container.clientHeight || 280 });
   }).observe(container);
 }
 
@@ -1047,6 +1065,8 @@ function applyIndicatorState() {
 // ── Fullscreen ──
 let isFullscreen = false;
 let fsOverlay = null;
+let fsSplitRatio = 0.6; // price chart gets 60% by default
+
 function toggleFullscreen() {
   if (isFullscreen) { exitFullscreen(); return; }
   isFullscreen = true;
@@ -1061,12 +1081,14 @@ function toggleFullscreen() {
         <button class="fs-exit-btn" onclick="toggleFullscreen()">✕ Exit Fullscreen</button>
       </div>
     </div>
-    <div class="fs-body">
+    <div class="fs-body" id="fsBody">
       <div class="fs-price" id="fsPriceChart"></div>
+      <div class="fs-splitter" id="fsSplitter"></div>
       <div class="fs-comp" id="fsCompChart"></div>
     </div>`;
   document.body.appendChild(fsOverlay);
 
+  // Clone indicator toggle buttons
   const fsToggles = fsOverlay.querySelector('#fsIndToggles');
   document.querySelectorAll('#indToggles .ind-btn').forEach(btn => {
     const clone = btn.cloneNode(true);
@@ -1079,6 +1101,9 @@ function toggleFullscreen() {
     fsToggles.appendChild(clone);
   });
 
+  // Apply split ratio and render charts
+  applyFsSplit();
+
   const data = chartData[currentTF];
   if (data) {
     createPriceChart(document.getElementById('fsPriceChart'), data);
@@ -1087,11 +1112,84 @@ function toggleFullscreen() {
     applyIndicatorState();
   }
 
+  // Splitter drag logic
+  initSplitter();
+
   document.addEventListener('keydown', fsEscHandler);
 }
+
+function applyFsSplit() {
+  const body = document.getElementById('fsBody');
+  if (!body) return;
+  const price = document.getElementById('fsPriceChart');
+  const comp = document.getElementById('fsCompChart');
+  const splitter = document.getElementById('fsSplitter');
+  const totalH = body.clientHeight - (splitter ? splitter.offsetHeight : 6);
+  const pH = Math.round(totalH * fsSplitRatio);
+  const cH = totalH - pH;
+  price.style.height = pH + 'px';
+  comp.style.height = cH + 'px';
+}
+
+function initSplitter() {
+  const splitter = document.getElementById('fsSplitter');
+  const body = document.getElementById('fsBody');
+  if (!splitter || !body) return;
+
+  let dragging = false;
+  let startY = 0;
+  let startRatio = 0;
+
+  function onDown(e) {
+    dragging = true;
+    startY = e.clientY || e.touches?.[0]?.clientY || 0;
+    startRatio = fsSplitRatio;
+    splitter.classList.add('active');
+    document.body.style.cursor = 'row-resize';
+    document.body.style.userSelect = 'none';
+    e.preventDefault();
+  }
+  function onMove(e) {
+    if (!dragging) return;
+    const clientY = e.clientY || e.touches?.[0]?.clientY || 0;
+    const dy = clientY - startY;
+    const totalH = body.clientHeight - splitter.offsetHeight;
+    const newRatio = Math.min(0.85, Math.max(0.15, startRatio + dy / totalH));
+    fsSplitRatio = newRatio;
+    applyFsSplit();
+  }
+  function onUp() {
+    if (!dragging) return;
+    dragging = false;
+    splitter.classList.remove('active');
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+  }
+
+  splitter.addEventListener('mousedown', onDown);
+  splitter.addEventListener('touchstart', onDown, { passive: false });
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('touchmove', onMove, { passive: false });
+  document.addEventListener('mouseup', onUp);
+  document.addEventListener('touchend', onUp);
+
+  // Store cleanup refs
+  splitter._cleanup = () => {
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('touchmove', onMove);
+    document.removeEventListener('mouseup', onUp);
+    document.removeEventListener('touchend', onUp);
+  };
+}
+
 function exitFullscreen() {
   isFullscreen = false;
-  if (fsOverlay) { fsOverlay.remove(); fsOverlay = null; }
+  if (fsOverlay) {
+    const sp = fsOverlay.querySelector('#fsSplitter');
+    if (sp?._cleanup) sp._cleanup();
+    fsOverlay.remove();
+    fsOverlay = null;
+  }
   document.removeEventListener('keydown', fsEscHandler);
   const data = chartData[currentTF];
   if (data) {
