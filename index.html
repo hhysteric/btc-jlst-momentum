@@ -248,6 +248,30 @@ footer a { color: var(--accent2); text-decoration: none; }
   pointer-events: none; z-index: 50; display: none;
   box-shadow: var(--shadow);
 }
+
+/* ── TradingView-style chart legend overlay ── */
+.chart-box { position: relative; }
+.chart-legend {
+  position: absolute; top: 8px; left: 12px; z-index: 10;
+  font-family: var(--mono); font-size: 11px; line-height: 1.5;
+  pointer-events: none; color: var(--fg2);
+}
+.chart-legend .legend-title {
+  font-weight: 600; font-size: 12px; color: var(--fg);
+  margin-bottom: 2px;
+}
+.chart-legend .legend-row { white-space: nowrap; }
+.chart-legend .legend-row span { margin-right: 10px; }
+.chart-legend .lbl { color: var(--fg3); }
+.chart-legend .v-up { color: #26a69a; }
+.chart-legend .v-dn { color: #ef5350; }
+.chart-legend .pct-up { color: #26a69a; font-weight: 600; }
+.chart-legend .pct-dn { color: #ef5350; font-weight: 600; }
+.chart-legend .v-rev { color: #d29922; }
+.chart-legend .v-mom { color: #58a6ff; }
+.chart-legend .v-ac1 { color: #bc8cff; }
+.chart-legend .v-comp-pos { color: #3fb950; }
+.chart-legend .v-comp-neg { color: #f85149; }
 </style>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
@@ -558,36 +582,130 @@ function regimeLabel(s) {
   return map[s] || s;
 }
 
+// ── Shared OHLC data lookup (built during createPriceChart) ──
+let ohlcByTime = {};   // key: "YYYY-MM-DD" → {o,h,l,c,vol,prevC}
+let compByTime = {};    // key: "YYYY-MM-DD" → {composite,rev,mom,ac1}
+let latestOHLC = null;
+let latestComp = null;
+
+function timeKey(t) {
+  // t = {year, month, day}
+  return `${t.year}-${String(t.month).padStart(2,'0')}-${String(t.day).padStart(2,'0')}`;
+}
+
+function fmtOHLC(v) {
+  if (v == null) return '--';
+  return Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function fmtVol(v) {
+  if (v == null) return '--';
+  if (v >= 1e9) return (v / 1e9).toFixed(2) + 'B';
+  if (v >= 1e6) return (v / 1e6).toFixed(2) + 'M';
+  if (v >= 1e3) return (v / 1e3).toFixed(1) + 'K';
+  return v.toFixed(0);
+}
+
+function updatePriceLegend(o, h, l, c, vol, prevC) {
+  const isUp = c >= o;
+  const cls = isUp ? 'v-up' : 'v-dn';
+  document.getElementById('lg-o').className = cls;
+  document.getElementById('lg-o').textContent = fmtOHLC(o);
+  document.getElementById('lg-h').className = cls;
+  document.getElementById('lg-h').textContent = fmtOHLC(h);
+  document.getElementById('lg-l').className = cls;
+  document.getElementById('lg-l').textContent = fmtOHLC(l);
+  document.getElementById('lg-c').className = cls;
+  document.getElementById('lg-c').textContent = fmtOHLC(c);
+  document.getElementById('lg-vol').textContent = fmtVol(vol);
+  // Daily % change from previous close
+  const pctEl = document.getElementById('lg-pct');
+  if (prevC != null && prevC !== 0) {
+    const pct = ((c - prevC) / prevC * 100);
+    pctEl.textContent = (pct >= 0 ? '+' : '') + pct.toFixed(2) + '%';
+    pctEl.className = pct >= 0 ? 'pct-up' : 'pct-dn';
+  } else {
+    pctEl.textContent = '--';
+    pctEl.className = '';
+  }
+}
+
+function updateCompLegend(comp, rev, mom, ac1) {
+  const compEl = document.getElementById('lg-comp');
+  compEl.textContent = fmtNum(comp);
+  compEl.className = comp >= 0 ? 'v-comp-pos' : 'v-comp-neg';
+  document.getElementById('lg-rev').textContent = fmtNum(rev);
+  document.getElementById('lg-mom').textContent = fmtNum(mom);
+  document.getElementById('lg-ac1').textContent = fmtNum(ac1);
+}
+
 // ── Chart creation ──
 function createPriceChart(container, data) {
+  // Build legend HTML (re-inserted after chart creation)
+  const tfLabels = { daily: '日线', weekly: '周线', monthly: '月线' };
+  const legendHTML = `<div class="chart-legend" id="priceLegend">
+    <div class="legend-title">BTC/USDT · <span id="legendTF">${tfLabels[currentTF] || currentTF}</span></div>
+    <div class="legend-row" id="ohlcRow">
+      <span><span class="lbl">O </span><span id="lg-o">--</span></span>
+      <span><span class="lbl">H </span><span id="lg-h">--</span></span>
+      <span><span class="lbl">L </span><span id="lg-l">--</span></span>
+      <span><span class="lbl">C </span><span id="lg-c">--</span></span>
+      <span id="lg-pct">--</span>
+    </div>
+    <div class="legend-row">
+      <span><span class="lbl">Vol </span><span id="lg-vol" style="color:var(--fg2)">--</span></span>
+    </div>
+  </div>`;
   container.innerHTML = '';
+
   const ct = getChartTheme();
   const chart = LightweightCharts.createChart(container, {
     width: container.clientWidth,
     height: 320,
     layout: { background: { color: ct.bg }, textColor: ct.text, fontSize: 11 },
     grid: { vertLines: { color: ct.grid }, horzLines: { color: ct.grid } },
-    crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
-    timeScale: { timeVisible: false, borderColor: ct.border },
+    crosshair: {
+      mode: LightweightCharts.CrosshairMode.Normal,
+      vertLine: { labelVisible: true },
+      horzLine: { labelVisible: true },
+    },
+    timeScale: { timeVisible: false, borderVisible: false, borderColor: ct.border },
     rightPriceScale: { borderColor: ct.border },
   });
   priceChartObj = chart;
+  container.insertAdjacentHTML('beforeend', legendHTML);
 
-  // Area series for price
-  priceSeries = chart.addAreaSeries({
-    topColor: 'rgba(247,147,26,0.3)',
-    bottomColor: 'rgba(247,147,26,0.02)',
-    lineColor: '#f7931a',
-    lineWidth: 2,
+  // Candlestick series
+  priceSeries = chart.addCandlestickSeries({
+    upColor: '#26a69a', downColor: '#ef5350',
+    borderUpColor: '#26a69a', borderDownColor: '#ef5350',
+    wickUpColor: '#26a69a', wickDownColor: '#ef5350',
   });
 
   const d = data.data;
-  const lineData = [];
+  const hasOHLC = d.open && d.high && d.low;
+  const candleData = [];
+  ohlcByTime = {};
   for (let i = 0; i < d.timestamps.length; i++) {
     if (d.close[i] == null) continue;
-    lineData.push({ time: tsToDate(d.timestamps[i]), value: d.close[i] });
+    const t = tsToDate(d.timestamps[i]);
+    const o = hasOHLC ? (d.open[i] ?? d.close[i]) : d.close[i];
+    const h = hasOHLC ? (d.high[i] ?? d.close[i]) : d.close[i];
+    const l = hasOHLC ? (d.low[i] ?? d.close[i]) : d.close[i];
+    const c = d.close[i];
+    candleData.push({ time: t, open: o, high: h, low: l, close: c });
+    const prevC = i > 0 ? d.close[i - 1] : null;
+    ohlcByTime[timeKey(t)] = { o, h, l, c, vol: d.volume[i], prevC };
   }
-  priceSeries.setData(lineData);
+  priceSeries.setData(candleData);
+
+  // Store latest for default legend state
+  if (candleData.length > 0) {
+    const last = candleData[candleData.length - 1];
+    const k = timeKey(last.time);
+    latestOHLC = ohlcByTime[k];
+    updatePriceLegend(latestOHLC.o, latestOHLC.h, latestOHLC.l, latestOHLC.c, latestOHLC.vol, latestOHLC.prevC);
+  }
 
   // Volume histogram
   priceVolSeries = chart.addHistogramSeries({
@@ -634,6 +752,28 @@ function createPriceChart(container, data) {
   }
   priceSeries.setMarkers(markers);
 
+  // Crosshair move → update OHLC legend + sync composite chart
+  chart.subscribeCrosshairMove(param => {
+    if (param.time) {
+      const k = timeKey(param.time);
+      const bar = ohlcByTime[k];
+      if (bar) updatePriceLegend(bar.o, bar.h, bar.l, bar.c, bar.vol, bar.prevC);
+      // Sync crosshair to composite chart
+      if (compChartObj && compSeries) {
+        const compBar = compByTime[k];
+        if (compBar != null) {
+          compChartObj.setCrosshairPosition(compBar.composite, param.time, compSeries);
+          updateCompLegend(compBar.composite, compBar.rev, compBar.mom, compBar.ac1);
+        }
+      }
+    } else {
+      // Mouse left → show latest
+      if (latestOHLC) updatePriceLegend(latestOHLC.o, latestOHLC.h, latestOHLC.l, latestOHLC.c, latestOHLC.vol, latestOHLC.prevC);
+      if (compChartObj) compChartObj.clearCrosshairPosition();
+      if (latestComp) updateCompLegend(latestComp.composite, latestComp.rev, latestComp.mom, latestComp.ac1);
+    }
+  });
+
   chart.timeScale().fitContent();
   new ResizeObserver(() => {
     chart.applyOptions({ width: container.clientWidth });
@@ -641,20 +781,54 @@ function createPriceChart(container, data) {
 }
 
 function createCompChart(container, data) {
+  const compLegendHTML = `<div class="chart-legend" id="compLegend">
+    <div class="legend-title">JLST 综合评分</div>
+    <div class="legend-row" id="compLegendRow">
+      <span><span class="lbl">综合 </span><span id="lg-comp">--</span></span>
+      <span><span class="lbl">反转 </span><span id="lg-rev" class="v-rev">--</span></span>
+      <span><span class="lbl">动量 </span><span id="lg-mom" class="v-mom">--</span></span>
+      <span><span class="lbl">AC(1) </span><span id="lg-ac1" class="v-ac1">--</span></span>
+    </div>
+  </div>`;
   container.innerHTML = '';
+
   const ct = getChartTheme();
   const chart = LightweightCharts.createChart(container, {
     width: container.clientWidth,
     height: 280,
     layout: { background: { color: ct.bg }, textColor: ct.text, fontSize: 11 },
     grid: { vertLines: { color: ct.grid }, horzLines: { color: ct.grid } },
-    crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
-    timeScale: { timeVisible: false, borderColor: ct.border },
+    crosshair: {
+      mode: LightweightCharts.CrosshairMode.Normal,
+      vertLine: { labelVisible: true },
+      horzLine: { labelVisible: true },
+    },
+    timeScale: { timeVisible: false, borderVisible: false, borderColor: ct.border },
     rightPriceScale: { borderColor: ct.border },
   });
   compChartObj = chart;
+  container.insertAdjacentHTML('beforeend', compLegendHTML);
 
   const d = data.data;
+
+  // Build compByTime lookup
+  compByTime = {};
+  for (let i = 0; i < d.timestamps.length; i++) {
+    const t = tsToDate(d.timestamps[i]);
+    compByTime[timeKey(t)] = {
+      composite: d.composite[i],
+      rev: d.rev[i],
+      mom: d.mom[i],
+      ac1: d.ac1[i],
+    };
+  }
+
+  // Store latest for default legend
+  if (d.timestamps.length > 0) {
+    const lastT = tsToDate(d.timestamps[d.timestamps.length - 1]);
+    latestComp = compByTime[timeKey(lastT)];
+    if (latestComp) updateCompLegend(latestComp.composite, latestComp.rev, latestComp.mom, latestComp.ac1);
+  }
 
   // Composite histogram
   compSeries = chart.addHistogramSeries({
@@ -711,6 +885,28 @@ function createCompChart(container, data) {
     ac1Data.push({ time: tsToDate(d.timestamps[i]), value: d.ac1[i] });
   }
   ac1Series.setData(ac1Data);
+
+  // Crosshair move → update comp legend + sync price chart
+  chart.subscribeCrosshairMove(param => {
+    if (param.time) {
+      const k = timeKey(param.time);
+      const bar = compByTime[k];
+      if (bar) updateCompLegend(bar.composite, bar.rev, bar.mom, bar.ac1);
+      // Sync crosshair to price chart
+      if (priceChartObj && priceSeries) {
+        const ohlc = ohlcByTime[k];
+        if (ohlc) {
+          priceChartObj.setCrosshairPosition(ohlc.c, param.time, priceSeries);
+          updatePriceLegend(ohlc.o, ohlc.h, ohlc.l, ohlc.c, ohlc.vol, ohlc.prevC);
+        }
+      }
+    } else {
+      // Mouse left → show latest
+      if (latestComp) updateCompLegend(latestComp.composite, latestComp.rev, latestComp.mom, latestComp.ac1);
+      if (priceChartObj) priceChartObj.clearCrosshairPosition();
+      if (latestOHLC) updatePriceLegend(latestOHLC.o, latestOHLC.h, latestOHLC.l, latestOHLC.c, latestOHLC.vol, latestOHLC.prevC);
+    }
+  });
 
   chart.timeScale().fitContent();
   new ResizeObserver(() => {

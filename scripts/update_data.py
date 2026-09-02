@@ -23,6 +23,7 @@ Paper → Indicator mapping:
   Prediction c         → Noise↑ → wRev↑, wMom↓
 """
 
+import csv
 import json
 import math
 import os
@@ -169,6 +170,87 @@ def parse_klines(raw: list) -> dict:
     return {"ts": ts, "open": o, "high": h, "low": lo, "close": c, "volume": vol, "n": n}
 
 
+def load_historical_csv(path: str) -> dict:
+    """Load btc_historical.csv (semicolon-delimited, newest-first, OHLCV)."""
+    rows = []
+    with open(path, "r", encoding="utf-8-sig") as f:
+        reader = csv.DictReader(f, delimiter=";")
+        for row in reader:
+            try:
+                dt_str = row["timeOpen"][:10]  # "2026-08-31"
+                dt = datetime.strptime(dt_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                ts_ms = int(dt.timestamp() * 1000)
+                rows.append({
+                    "ts": ts_ms,
+                    "open": float(row["open"]),
+                    "high": float(row["high"]),
+                    "low": float(row["low"]),
+                    "close": float(row["close"]),
+                    "volume": float(row["volume"]),
+                })
+            except (ValueError, KeyError):
+                continue
+    # Sort ascending by timestamp
+    rows.sort(key=lambda r: r["ts"])
+    n = len(rows)
+    return {
+        "ts": [r["ts"] for r in rows],
+        "open": [r["open"] for r in rows],
+        "high": [r["high"] for r in rows],
+        "low": [r["low"] for r in rows],
+        "close": [r["close"] for r in rows],
+        "volume": [r["volume"] for r in rows],
+        "n": n,
+    }
+
+
+def merge_data(csv_data: dict, binance_data: dict) -> dict:
+    """Merge CSV base with Binance overlay. Binance wins on overlapping dates."""
+    # Build date→index map for Binance data (keyed by date string to avoid ms mismatches)
+    bin_map = {}
+    for i in range(binance_data["n"]):
+        day_key = datetime.fromtimestamp(binance_data["ts"][i] / 1000, tz=timezone.utc).strftime("%Y-%m-%d")
+        bin_map[day_key] = i
+
+    merged = {"ts": [], "open": [], "high": [], "low": [], "close": [], "volume": []}
+
+    # First: add all CSV rows that DON'T exist in Binance
+    seen_dates = set()
+    for i in range(csv_data["n"]):
+        day_key = datetime.fromtimestamp(csv_data["ts"][i] / 1000, tz=timezone.utc).strftime("%Y-%m-%d")
+        if day_key in bin_map:
+            continue  # Binance will provide this date
+        if day_key in seen_dates:
+            continue
+        seen_dates.add(day_key)
+        merged["ts"].append(csv_data["ts"][i])
+        merged["open"].append(csv_data["open"][i])
+        merged["high"].append(csv_data["high"][i])
+        merged["low"].append(csv_data["low"][i])
+        merged["close"].append(csv_data["close"][i])
+        merged["volume"].append(csv_data["volume"][i])
+
+    # Then: add all Binance rows
+    for i in range(binance_data["n"]):
+        day_key = datetime.fromtimestamp(binance_data["ts"][i] / 1000, tz=timezone.utc).strftime("%Y-%m-%d")
+        if day_key in seen_dates:
+            continue
+        seen_dates.add(day_key)
+        merged["ts"].append(binance_data["ts"][i])
+        merged["open"].append(binance_data["open"][i])
+        merged["high"].append(binance_data["high"][i])
+        merged["low"].append(binance_data["low"][i])
+        merged["close"].append(binance_data["close"][i])
+        merged["volume"].append(binance_data["volume"][i])
+
+    # Sort by timestamp
+    indices = sorted(range(len(merged["ts"])), key=lambda i: merged["ts"][i])
+    for key in merged:
+        merged[key] = [merged[key][i] for i in indices]
+    merged["n"] = len(merged["ts"])
+    return merged
+
+
 # ---------------------------------------------------------------------------
 # Indicator math helpers
 # ---------------------------------------------------------------------------
@@ -307,6 +389,7 @@ def compute_jlst(data: dict, params: dict) -> dict:
     Returns dict of arrays + summary.
     """
     n = data["n"]
+    opn = data["open"]
     close = data["close"]
     high = data["high"]
     low = data["low"]
@@ -599,7 +682,10 @@ def compute_jlst(data: dict, params: dict) -> dict:
         "summary": summary,
         "data": {
             "timestamps": timestamps[start:],
-            "close": [_r(v) for v in close[start:]],
+            "open": [_r(v, 2) for v in opn[start:]],
+            "high": [_r(v, 2) for v in high[start:]],
+            "low": [_r(v, 2) for v in low[start:]],
+            "close": [_r(v, 2) for v in close[start:]],
             "volume": [_r(v) for v in volume[start:]],
             "composite": _slice(comp, start),
             "rev": _slice(rev_eff, start),
@@ -673,6 +759,14 @@ def main():
     print(f"Time: {datetime.now(timezone.utc).isoformat()}")
     print("=" * 60)
 
+    # Load historical CSV for daily backfill
+    csv_path = data_dir / "btc_historical.csv"
+    csv_data = None
+    if csv_path.exists():
+        print(f"\n  Loading historical CSV: {csv_path.name}")
+        csv_data = load_historical_csv(str(csv_path))
+        print(f"  CSV: {csv_data['n']} rows")
+
     for tf_name, params in TIMEFRAME_PARAMS.items():
         print(f"\n>> Processing {params['label']} ({tf_name})...")
 
@@ -685,6 +779,12 @@ def main():
         print(f"  Got {len(raw)} candles")
 
         data = parse_klines(raw)
+
+        # Merge with historical CSV for daily timeframe
+        if tf_name == "daily" and csv_data is not None:
+            print(f"  Merging with historical CSV...")
+            data = merge_data(csv_data, data)
+            print(f"  Merged: {data['n']} total candles")
 
         # Compute indicators
         print(f"  Computing JLST indicators...")
