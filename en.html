@@ -249,6 +249,52 @@ footer a { color: var(--accent2); text-decoration: none; }
   box-shadow: var(--shadow);
 }
 
+/* ── Indicator toggle buttons ── */
+.ind-toggles {
+  display: flex; gap: 4px; flex-wrap: wrap;
+}
+.ind-btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px; border-radius: 4px; cursor: pointer;
+  font-size: 11px; font-weight: 500; font-family: var(--mono);
+  background: transparent; border: 1px solid var(--border);
+  transition: all 0.15s; line-height: 1.4;
+}
+.ind-btn .dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  display: inline-block; flex-shrink: 0;
+}
+.ind-btn.off { opacity: 0.35; }
+.ind-btn.off .dot { background: var(--fg3) !important; }
+.ind-btn:hover { border-color: var(--fg3); }
+
+/* ── Fullscreen overlay ── */
+.charts-fullscreen {
+  position: fixed; inset: 0; z-index: 200;
+  background: var(--bg); display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.charts-fullscreen .fs-toolbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 16px; border-bottom: 1px solid var(--border);
+  background: var(--bg2); flex-shrink: 0;
+}
+.charts-fullscreen .fs-toolbar .fs-title {
+  font-size: 14px; font-weight: 600; color: var(--accent);
+}
+.charts-fullscreen .fs-body {
+  flex: 1; display: flex; flex-direction: column; overflow: hidden;
+}
+.charts-fullscreen .fs-price { flex: 1; min-height: 0; position: relative; }
+.charts-fullscreen .fs-comp  { height: 35%; min-height: 160px; position: relative; border-top: 1px solid var(--border); }
+.fs-exit-btn {
+  padding: 4px 14px; border-radius: 6px; cursor: pointer;
+  font-size: 12px; font-weight: 600;
+  background: var(--bg3); color: var(--fg2);
+  border: 1px solid var(--border); transition: all 0.2s;
+}
+.fs-exit-btn:hover { background: var(--bg4); color: var(--fg); }
+
 /* ── TradingView-style chart legend overlay ── */
 .chart-box { position: relative; }
 .chart-legend {
@@ -310,19 +356,30 @@ footer a { color: var(--accent2); text-decoration: none; }
   </div>
 
   <!-- Charts -->
-  <div class="charts-area">
+  <div class="charts-area" id="chartsArea">
     <div class="chart-col">
       <div class="chart-panel">
         <div class="chart-title">
           <span>BTC Price + Regime Background + Signals</span>
-          <span id="priceRange" style="font-family:var(--mono);font-size:11px;color:var(--fg3)"></span>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span id="priceRange" style="font-family:var(--mono);font-size:11px;color:var(--fg3)"></span>
+            <button class="ind-btn" onclick="toggleFullscreen()" title="Fullscreen" id="fsBtn">⛶ Fullscreen</button>
+          </div>
         </div>
         <div class="chart-box" id="priceChart" style="height:320px"></div>
       </div>
       <div class="chart-panel" style="margin-top:12px">
         <div class="chart-title">
-          <span>JLST Composite Score + Rev / Mom / AC(1)</span>
-          <span id="compLatest" style="font-family:var(--mono);font-size:11px"></span>
+          <span>JLST Composite Score</span>
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            <div class="ind-toggles" id="indToggles">
+              <button class="ind-btn" data-key="composite" onclick="toggleIndicator('composite')"><span class="dot" style="background:#3fb950"></span>Comp</button>
+              <button class="ind-btn" data-key="rev" onclick="toggleIndicator('rev')"><span class="dot" style="background:#d29922"></span>Rev</button>
+              <button class="ind-btn" data-key="mom" onclick="toggleIndicator('mom')"><span class="dot" style="background:#58a6ff"></span>Mom</button>
+              <button class="ind-btn" data-key="ac1" onclick="toggleIndicator('ac1')"><span class="dot" style="background:#bc8cff"></span>AC(1)</button>
+            </div>
+            <span id="compLatest" style="font-family:var(--mono);font-size:11px"></span>
+          </div>
         </div>
         <div class="chart-box" id="compChart" style="height:280px"></div>
       </div>
@@ -905,6 +962,147 @@ function createCompChart(container, data) {
   }).observe(container);
 }
 
+// ── Time scale sync (drag/scroll one chart → other follows) ──
+let isSyncing = false;
+function syncTimeScales() {
+  if (!priceChartObj || !compChartObj) return;
+  priceChartObj.timeScale().subscribeVisibleLogicalRangeChange(range => {
+    if (isSyncing || !range) return;
+    isSyncing = true;
+    compChartObj.timeScale().setVisibleLogicalRange(range);
+    isSyncing = false;
+  });
+  compChartObj.timeScale().subscribeVisibleLogicalRangeChange(range => {
+    if (isSyncing || !range) return;
+    isSyncing = true;
+    priceChartObj.timeScale().setVisibleLogicalRange(range);
+    isSyncing = false;
+  });
+}
+
+// ── Indicator toggle (show/hide series on composite chart) ──
+const indVisible = { composite: true, rev: true, mom: true, ac1: true };
+function toggleIndicator(key) {
+  indVisible[key] = !indVisible[key];
+  const seriesMap = { composite: compSeries, rev: revSeries, mom: momSeries, ac1: ac1Series };
+  const s = seriesMap[key];
+  if (s) {
+    if (key === 'composite') {
+      if (indVisible[key]) {
+        const d = chartData[currentTF].data;
+        const compData = [];
+        for (let i = 0; i < d.timestamps.length; i++) {
+          const v = d.composite[i]; if (v == null) continue;
+          let color;
+          if (v >= 1.0) color = 'rgba(63,185,80,0.9)';
+          else if (v > 0) color = 'rgba(63,185,80,0.4)';
+          else if (v <= -1.0) color = 'rgba(248,81,73,0.9)';
+          else color = 'rgba(248,81,73,0.4)';
+          compData.push({ time: tsToDate(d.timestamps[i]), value: v, color });
+        }
+        s.setData(compData);
+      } else {
+        const d = chartData[currentTF].data;
+        const compData = [];
+        for (let i = 0; i < d.timestamps.length; i++) {
+          const v = d.composite[i]; if (v == null) continue;
+          compData.push({ time: tsToDate(d.timestamps[i]), value: v, color: 'transparent' });
+        }
+        s.setData(compData);
+      }
+    } else {
+      const colors = { rev: '#d29922', mom: '#58a6ff', ac1: '#bc8cff' };
+      s.applyOptions({ color: indVisible[key] ? colors[key] : 'transparent' });
+    }
+  }
+  const btn = document.querySelector(`.ind-btn[data-key="${key}"]`);
+  if (btn) btn.classList.toggle('off', !indVisible[key]);
+}
+
+function applyIndicatorState() {
+  const seriesMap = { composite: compSeries, rev: revSeries, mom: momSeries, ac1: ac1Series };
+  const colors = { rev: '#d29922', mom: '#58a6ff', ac1: '#bc8cff' };
+  Object.keys(indVisible).forEach(k => {
+    const s = seriesMap[k];
+    if (!s) return;
+    if (k === 'composite') {
+      if (!indVisible[k]) {
+        const d = chartData[currentTF].data;
+        const cd = [];
+        for (let i = 0; i < d.timestamps.length; i++) {
+          const v = d.composite[i]; if (v == null) continue;
+          cd.push({ time: tsToDate(d.timestamps[i]), value: v, color: 'transparent' });
+        }
+        s.setData(cd);
+      }
+    } else {
+      s.applyOptions({ color: indVisible[k] ? colors[k] : 'transparent' });
+    }
+    document.querySelectorAll(`.ind-btn[data-key="${k}"]`).forEach(btn => {
+      btn.classList.toggle('off', !indVisible[k]);
+    });
+  });
+}
+
+// ── Fullscreen ──
+let isFullscreen = false;
+let fsOverlay = null;
+function toggleFullscreen() {
+  if (isFullscreen) { exitFullscreen(); return; }
+  isFullscreen = true;
+
+  fsOverlay = document.createElement('div');
+  fsOverlay.className = 'charts-fullscreen';
+  fsOverlay.innerHTML = `
+    <div class="fs-toolbar">
+      <span class="fs-title">JLST BTC Reversal-Momentum</span>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div class="ind-toggles" id="fsIndToggles"></div>
+        <button class="fs-exit-btn" onclick="toggleFullscreen()">✕ Exit Fullscreen</button>
+      </div>
+    </div>
+    <div class="fs-body">
+      <div class="fs-price" id="fsPriceChart"></div>
+      <div class="fs-comp" id="fsCompChart"></div>
+    </div>`;
+  document.body.appendChild(fsOverlay);
+
+  const fsToggles = fsOverlay.querySelector('#fsIndToggles');
+  document.querySelectorAll('#indToggles .ind-btn').forEach(btn => {
+    const clone = btn.cloneNode(true);
+    clone.onclick = () => {
+      toggleIndicator(clone.dataset.key);
+      document.querySelectorAll(`.ind-btn[data-key="${clone.dataset.key}"]`).forEach(b => {
+        b.classList.toggle('off', !indVisible[clone.dataset.key]);
+      });
+    };
+    fsToggles.appendChild(clone);
+  });
+
+  const data = chartData[currentTF];
+  if (data) {
+    createPriceChart(document.getElementById('fsPriceChart'), data);
+    createCompChart(document.getElementById('fsCompChart'), data);
+    syncTimeScales();
+    applyIndicatorState();
+  }
+
+  document.addEventListener('keydown', fsEscHandler);
+}
+function exitFullscreen() {
+  isFullscreen = false;
+  if (fsOverlay) { fsOverlay.remove(); fsOverlay = null; }
+  document.removeEventListener('keydown', fsEscHandler);
+  const data = chartData[currentTF];
+  if (data) {
+    createPriceChart(document.getElementById('priceChart'), data);
+    createCompChart(document.getElementById('compChart'), data);
+    syncTimeScales();
+    applyIndicatorState();
+  }
+}
+function fsEscHandler(e) { if (e.key === 'Escape') toggleFullscreen(); }
+
 // ── Dashboard update ──
 function updateDashboard(data) {
   const s = data.summary;
@@ -1028,6 +1226,7 @@ async function render(tf) {
 
   createPriceChart(document.getElementById('priceChart'), data);
   createCompChart(document.getElementById('compChart'), data);
+  syncTimeScales();
   updateDashboard(data);
   updateSignalTable(data);
 
