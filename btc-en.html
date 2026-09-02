@@ -950,12 +950,12 @@ function createFundChart(container, data) {
     const t = tsToDate(d.timestamps[i]);
     const v = fr[i];
     fundByTime[timeKey(t)] = { fr: v };
-    if (v == null) continue;
-    lastValid = v;
+    if (v != null) lastValid = v;
+    // Always push a data point so logicalRange indices align with price/comp charts
     fundData.push({
       time: t,
-      value: v,
-      color: v >= 0 ? 'rgba(248,81,73,0.7)' : 'rgba(63,185,80,0.7)',
+      value: v != null ? v : 0,
+      color: v != null ? (v >= 0 ? 'rgba(248,81,73,0.7)' : 'rgba(63,185,80,0.7)') : 'rgba(0,0,0,0)',
     });
   }
   fundSeries.setData(fundData);
