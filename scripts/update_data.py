@@ -262,9 +262,40 @@ def merge_data(csv_data: dict, binance_data: dict) -> dict:
 def fetch_funding_rate(symbol: str = "BTCUSDT") -> list:
     """Fetch full funding rate history from Binance Futures API.
     Returns list of {ts_ms, rate} sorted ascending.
-    Each record is one 8h funding event."""
+    Each record is one 8h funding event.
+    Tries direct connection first, then falls back to local proxy (127.0.0.1:7897)
+    for environments where fapi.binance.com is blocked by GFW."""
     all_data = []
     start_time = int(datetime(2019, 9, 10, tzinfo=timezone.utc).timestamp() * 1000)  # funding starts ~2019-09
+
+    # Decide whether to use proxy: try a quick direct request first
+    proxy_handler = None
+    test_url = f"{FAPI_BASE}/fundingRate?symbol={symbol}&limit=1"
+    test_req = urllib.request.Request(test_url)
+    test_req.add_header("User-Agent", "JLST-BTC-Pipeline/2.0")
+    try:
+        with urllib.request.urlopen(test_req, timeout=5) as _:
+            pass
+        print("  Funding API: direct connection OK")
+    except Exception:
+        # Direct failed, try local proxy
+        try:
+            proxy = urllib.request.ProxyHandler({
+                "https": "http://127.0.0.1:7897",
+                "http": "http://127.0.0.1:7897",
+            })
+            opener = urllib.request.build_opener(proxy)
+            test_req2 = urllib.request.Request(test_url)
+            test_req2.add_header("User-Agent", "JLST-BTC-Pipeline/2.0")
+            with opener.open(test_req2, timeout=8) as _:
+                pass
+            proxy_handler = proxy
+            print("  Funding API: using local proxy 127.0.0.1:7897")
+        except Exception:
+            print("  Funding API: both direct and proxy failed, will use cache only")
+            return []
+
+    opener = urllib.request.build_opener(proxy_handler) if proxy_handler else None
 
     for _ in range(50):  # safety
         url = f"{FAPI_BASE}/fundingRate?symbol={symbol}&limit=1000&startTime={start_time}"
@@ -272,8 +303,12 @@ def fetch_funding_rate(symbol: str = "BTCUSDT") -> list:
         req.add_header("User-Agent", "JLST-BTC-Pipeline/2.0")
 
         try:
-            with urllib.request.urlopen(req, timeout=15) as resp:
-                data = json.loads(resp.read())
+            if opener:
+                resp = opener.open(req, timeout=15)
+            else:
+                resp = urllib.request.urlopen(req, timeout=15)
+            data = json.loads(resp.read())
+            resp.close()
         except Exception as e:
             print(f"  [warn] funding rate fetch error: {e}")
             break
