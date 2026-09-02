@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JLST BTC Reversal-Momentum Dashboard</title>
+<meta name="description" content="BTC momentum and reversal analysis based on Jegadeesh, Luo, Subrahmanyam & Titman (2025, RFS)">
+<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+<style>
+/* ── Design tokens ── */
+:root {
+  --bg: #0d1117; --bg2: #161b22; --bg3: #1c2128; --bg4: #21262d;
+  --fg: #e6edf3; --fg2: #8b949e; --fg3: #484f58;
+  --accent: #f7931a; --accent2: #58a6ff; --green: #3fb950; --red: #f85149;
+  --teal: #39d353; --purple: #bc8cff; --orange: #d29922;
+  --border: #30363d; --radius: 8px;
+  --font: 'Inter', -apple-system, 'Segoe UI', sans-serif;
+  --mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, monospace;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg); color: var(--fg);
+  font-family: var(--font); font-size: 14px; line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Layout ── */
+.container { max-width: 1400px; margin: 0 auto; padding: 0 16px; }
+
+header {
+  background: var(--bg2); border-bottom: 1px solid var(--border);
+  padding: 16px 0; position: sticky; top: 0; z-index: 100;
+}
+.header-inner {
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 12px;
+}
+.logo { display: flex; align-items: center; gap: 10px; }
+.logo h1 {
+  font-size: 18px; font-weight: 700; color: var(--accent);
+  letter-spacing: -0.02em;
+}
+.logo .sub { font-size: 11px; color: var(--fg2); }
+
+.price-badge {
+  display: flex; align-items: center; gap: 16px;
+  background: var(--bg3); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 8px 16px;
+}
+.price-val { font-size: 22px; font-weight: 700; font-family: var(--mono); }
+.status-pill {
+  display: inline-block; padding: 3px 10px; border-radius: 12px;
+  font-size: 11px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.status-bullish { background: rgba(63,185,80,0.15); color: var(--green); }
+.status-bearish { background: rgba(248,81,73,0.15); color: var(--red); }
+.status-dead_zone { background: rgba(139,148,158,0.15); color: var(--fg2); }
+.status-watch { background: rgba(210,153,34,0.15); color: var(--orange); }
+
+/* ── Tabs ── */
+.tabs {
+  display: flex; gap: 2px; margin: 16px 0 12px;
+  background: var(--bg3); border-radius: var(--radius); padding: 3px;
+  width: fit-content;
+}
+.tab {
+  padding: 6px 20px; border-radius: 6px; cursor: pointer;
+  font-size: 13px; font-weight: 500; color: var(--fg2);
+  background: transparent; border: none; transition: all 0.2s;
+}
+.tab:hover { color: var(--fg); }
+.tab.active { background: var(--accent); color: #000; font-weight: 600; }
+
+/* ── Charts grid ── */
+.charts-area { display: flex; gap: 12px; margin-bottom: 16px; }
+.chart-col { flex: 1; min-width: 0; }
+.chart-panel {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: var(--radius); overflow: hidden;
+}
+.chart-title {
+  padding: 10px 14px; font-size: 12px; font-weight: 600;
+  color: var(--fg2); border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.chart-box { width: 100%; }
+
+/* ── Dashboard cards ── */
+.dashboard {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px; margin-bottom: 16px;
+}
+.card {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 16px;
+}
+.card-title {
+  font-size: 11px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.08em; color: var(--fg2); margin-bottom: 12px;
+}
+.metric-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 4px 0; border-bottom: 1px solid rgba(48,54,61,0.5);
+}
+.metric-row:last-child { border: none; }
+.metric-label { font-size: 12px; color: var(--fg2); }
+.metric-val {
+  font-family: var(--mono); font-size: 13px; font-weight: 600;
+}
+.val-pos { color: var(--green); }
+.val-neg { color: var(--red); }
+.val-warn { color: var(--orange); }
+.val-info { color: var(--accent2); }
+.val-neutral { color: var(--fg2); }
+
+/* ── Regime indicator ── */
+.regime-bar {
+  height: 4px; border-radius: 2px; margin-top: 8px;
+  transition: background 0.3s;
+}
+.regime-complementary { background: linear-gradient(90deg, var(--accent2), #1f6feb); }
+.regime-normal { background: var(--fg3); }
+.regime-resonance { background: linear-gradient(90deg, var(--orange), #da3633); }
+
+/* ── Signal history table ── */
+.table-wrap {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: var(--radius); overflow: hidden; margin-bottom: 16px;
+}
+.table-header {
+  padding: 12px 16px; display: flex; justify-content: space-between;
+  align-items: center; border-bottom: 1px solid var(--border);
+}
+.table-header h3 { font-size: 14px; font-weight: 600; }
+.table-scroll { max-height: 400px; overflow-y: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 12px; }
+th {
+  position: sticky; top: 0; background: var(--bg3);
+  padding: 8px 12px; text-align: left; font-weight: 600;
+  color: var(--fg2); font-size: 11px; text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+td { padding: 6px 12px; border-bottom: 1px solid rgba(48,54,61,0.3); }
+tr:hover { background: rgba(56,58,60,0.3); }
+.sig-long { color: var(--green); }
+.sig-short { color: var(--red); }
+.sig-cascade { color: var(--purple); }
+
+/* ── Theory section ── */
+.theory {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: var(--radius); margin-bottom: 16px; overflow: hidden;
+}
+.theory-header {
+  padding: 14px 16px; cursor: pointer;
+  display: flex; justify-content: space-between; align-items: center;
+  border-bottom: 1px solid var(--border);
+}
+.theory-header h3 { font-size: 14px; }
+.theory-header .arrow { transition: transform 0.2s; }
+.theory-header.open .arrow { transform: rotate(180deg); }
+.theory-body { padding: 0 16px; max-height: 0; overflow: hidden; transition: max-height 0.3s ease; }
+.theory-body.open { max-height: 3000px; padding: 16px; }
+.theory-body p { margin: 0.5em 0; font-size: 13px; line-height: 1.7; color: var(--fg2); }
+.theory-body strong { color: var(--fg); }
+.theory-body code {
+  background: var(--bg3); padding: 2px 6px; border-radius: 3px;
+  font-family: var(--mono); font-size: 12px;
+}
+.eq {
+  font-family: 'Georgia', serif; font-style: italic;
+  background: var(--bg3); padding: 8px 12px; border-radius: 4px;
+  display: block; margin: 8px 0; font-size: 13px;
+  border-left: 3px solid var(--accent2);
+}
+
+/* ── Footer ── */
+footer {
+  border-top: 1px solid var(--border); padding: 20px 0;
+  font-size: 11px; color: var(--fg3); text-align: center;
+  margin-top: 20px;
+}
+footer a { color: var(--accent2); text-decoration: none; }
+
+/* ── Loading ── */
+.loading {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; height: 300px; color: var(--fg2);
+}
+.spinner {
+  width: 32px; height: 32px; border: 3px solid var(--border);
+  border-top-color: var(--accent); border-radius: 50%;
+  animation: spin 0.8s linear infinite; margin-bottom: 12px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Responsive ── */
+@media (max-width: 900px) {
+  .charts-area { flex-direction: column; }
+  .dashboard { grid-template-columns: 1fr; }
+  .header-inner { flex-direction: column; align-items: flex-start; }
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--fg3); border-radius: 3px; }
+
+/* ── Tooltip ── */
+.chart-tooltip {
+  position: absolute; background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 6px; padding: 8px 12px; font-size: 12px;
+  pointer-events: none; z-index: 50; display: none;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+}
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<header>
+  <div class="container header-inner">
+    <div class="logo">
+      <div>
+        <h1>JLST BTC Reversal-Momentum</h1>
+        <div class="sub">Based on Jegadeesh, Luo, Subrahmanyam & Titman (2025, <em>Review of Financial Studies</em>)</div>
+      </div>
+    </div>
+    <div class="price-badge" id="priceBadge">
+      <div>
+        <div style="font-size:11px;color:var(--fg2)">BTC/USDT</div>
+        <div class="price-val" id="priceVal">--</div>
+      </div>
+      <div id="statusPill" class="status-pill status-watch">Loading</div>
+    </div>
+  </div>
+</header>
+
+<div class="container" style="padding-top:8px">
+
+  <!-- Timeframe tabs -->
+  <div class="tabs" id="tfTabs">
+    <button class="tab active" data-tf="daily">Daily</button>
+    <button class="tab" data-tf="weekly">Weekly</button>
+    <button class="tab" data-tf="monthly">Monthly</button>
+  </div>
+
+  <!-- Charts -->
+  <div class="charts-area">
+    <div class="chart-col">
+      <div class="chart-panel">
+        <div class="chart-title">
+          <span>BTC Price + Regime Background + Signals</span>
+          <span id="priceRange" style="font-family:var(--mono);font-size:11px;color:var(--fg3)"></span>
+        </div>
+        <div class="chart-box" id="priceChart" style="height:320px"></div>
+      </div>
+      <div class="chart-panel" style="margin-top:12px">
+        <div class="chart-title">
+          <span>JLST Composite Score + Rev / Mom / AC(1)</span>
+          <span id="compLatest" style="font-family:var(--mono);font-size:11px"></span>
+        </div>
+        <div class="chart-box" id="compChart" style="height:280px"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dashboard -->
+  <div class="dashboard" id="dashboard">
+    <!-- Card: Core Scores -->
+    <div class="card">
+      <div class="card-title">Core Indicator Scores</div>
+      <div id="coreMetrics">
+        <div class="metric-row"><span class="metric-label">Composite</span><span class="metric-val" id="m-comp">--</span></div>
+        <div class="metric-row"><span class="metric-label">Reversal (Rev, p1<0)</span><span class="metric-val" id="m-rev">--</span></div>
+        <div class="metric-row"><span class="metric-label">Momentum (Mom, p3-12>0)</span><span class="metric-val" id="m-mom">--</span></div>
+        <div class="metric-row"><span class="metric-label">AC(1) Autocorrelation</span><span class="metric-val" id="m-ac1">--</span></div>
+      </div>
+    </div>
+    <!-- Card: Dynamic Weights -->
+    <div class="card">
+      <div class="card-title">Dynamic Weights (Prediction c)</div>
+      <div>
+        <div class="metric-row"><span class="metric-label">wRev (reversal weight)</span><span class="metric-val" id="m-wrev">--</span></div>
+        <div class="metric-row"><span class="metric-label">wMom (momentum weight)</span><span class="metric-val" id="m-wmom">--</span></div>
+        <div class="metric-row"><span class="metric-label">Noise Proxy z</span><span class="metric-val" id="m-noisez">--</span></div>
+        <div class="metric-row"><span class="metric-label">Vol Regime (ATR fast/slow)</span><span class="metric-val" id="m-volreg">--</span></div>
+      </div>
+    </div>
+    <!-- Card: Regime -->
+    <div class="card">
+      <div class="card-title">Regime Confidence (Prediction b)</div>
+      <div>
+        <div class="metric-row"><span class="metric-label">corr(Rev, Mom)</span><span class="metric-val" id="m-corr">--</span></div>
+        <div class="metric-row"><span class="metric-label">Regime State</span><span class="metric-val" id="m-regime">--</span></div>
+        <div class="metric-row"><span class="metric-label">Signal State</span><span class="metric-val" id="m-signal">--</span></div>
+        <div class="metric-row"><span class="metric-label">Info Shock Window</span><span class="metric-val" id="m-shock">--</span></div>
+      </div>
+      <div class="regime-bar" id="regimeBar"></div>
+    </div>
+    <!-- Card: BTC Specific -->
+    <div class="card">
+      <div class="card-title">BTC-Specific Modules</div>
+      <div>
+        <div class="metric-row"><span class="metric-label">Days Since Halving</span><span class="metric-val" id="m-halv">--</span></div>
+        <div class="metric-row"><span class="metric-label">Halving Boost Active</span><span class="metric-val" id="m-halvactive">--</span></div>
+        <div class="metric-row"><span class="metric-label">Cascade Alert</span><span class="metric-val" id="m-cascade">--</span></div>
+        <div class="metric-row"><span class="metric-label">Last Updated</span><span class="metric-val val-neutral" id="m-update">--</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Params display -->
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-title">Current Parameters</div>
+    <div id="paramsDisplay" style="display:flex;flex-wrap:wrap;gap:8px;font-size:12px;font-family:var(--mono)"></div>
+  </div>
+
+  <!-- Signal History -->
+  <div class="table-wrap">
+    <div class="table-header">
+      <h3>Signal History</h3>
+      <span id="sigCount" style="font-size:12px;color:var(--fg2)"></span>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th>Date</th><th>Type</th><th>Price</th><th>Composite</th><th>Rev</th><th>Mom</th></tr>
+        </thead>
+        <tbody id="sigBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Theory Sections -->
+  <div class="theory" id="theoryModel">
+    <div class="theory-header" onclick="toggleTheory('theoryModel')">
+      <h3>Paper Core: How Reversal and Momentum Coexist</h3>
+      <span class="arrow">&#9660;</span>
+    </div>
+    <div class="theory-body">
+      <p><strong>The JLST Model (Jegadeesh, Luo, Subrahmanyam & Titman, 2025)</strong> provides a unified explanation for two seemingly contradictory patterns in asset returns:</p>
+      <p><strong>1. Short-term reversals (Table 2: ρ₁ < 0):</strong> Past 1-month returns negatively predict future returns. This arises because <strong>noise traders</strong> (retail investors) create temporary price deviations from fundamentals. Risk-averse market makers demand a premium to absorb these noise demands, causing prices to overshoot and then revert.</p>
+      <span class="eq">r<sub>t</sub> = α + ρ₁·r<sub>t−1</sub> + ρ₂·r<sub>t−2</sub> + … + ρ₁₂·r<sub>t−12</sub> + ε<sub>t</sub> &nbsp;&nbsp;where ρ₁ < 0</span>
+      <p><strong>2. Longer-term momentum (Table 2: ρ₃…ρ₁₂ > 0):</strong> Returns at lags 3–12 months are positively predictive. This stems from <strong>active investors' underreaction</strong> to information they did not produce (a form of overconfidence per Odean 1998). Prices gradually incorporate fundamental information, creating momentum.</p>
+      <p><strong>3. The transition (Table 2: ρ₂ ≈ 0):</strong> The 2-month lag coefficient is insignificant — a dead zone where reversal forces and momentum forces roughly cancel out.</p>
+      <p><strong>Proposition 2 (Skip effect):</strong> Skipping one period between formation and holding periods enhances momentum: L* = L − Cov(P₂−P₀, P₃−P₂) > L. This is because skipping removes the negative covariance caused by noise-trader-induced reversals.</p>
+      <p><strong>BTC Application:</strong> BTC's high retail participation and leverage amplify the noise trading channel, predicting <em>stronger reversals</em> than in traditional equities. The 24/7 market and extreme tail events require adapted parameters (30-day months, log returns, shorter normalization windows).</p>
+    </div>
+  </div>
+
+  <div class="theory" id="theoryPredA">
+    <div class="theory-header" onclick="toggleTheory('theoryPredA')">
+      <h3>Prediction (a): Information Shocks Attenuate Reversals</h3>
+      <span class="arrow">&#9660;</span>
+    </div>
+    <div class="theory-body">
+      <p><strong>Paper (Proposition 3):</strong> After sufficiently precise public signals (earnings announcements), short-term reversals attenuate. The underreaction to the signal creates post-announcement drift that more than offsets noise-trader-induced reversals.</p>
+      <p><strong>BTC Adaptation:</strong> BTC has no earnings announcements. We substitute <strong>information shocks</strong>: events where |log return| > 2.5× ATR% AND volume > 2× average volume. Examples: ETF approvals, regulatory news, exchange collapses.</p>
+      <p><strong>Implementation:</strong> Within 10 bars after a shock, the reversal component (Rev) is multiplied by 0.40. This means: <em>don't rely on "oversold bounce" logic right after a major information event — the market is absorbing genuine news, not just noise.</em></p>
+      <p><strong>Empirical support:</strong> Table 3 of the paper shows reversals attenuate by ~68% in the month after earnings announcements (c = +0.025 vs ρ₁ = −0.037).</p>
+    </div>
+  </div>
+
+  <div class="theory" id="theoryPredB">
+    <div class="theory-header" onclick="toggleTheory('theoryPredB')">
+      <h3>Prediction (b): Reversal and Momentum Profits Are Negatively Correlated</h3>
+      <span class="arrow">&#9660;</span>
+    </div>
+    <div class="theory-body">
+      <p><strong>Paper:</strong> Because exogenous shifts in noise trading generate stronger reversals and weaker momentum, the model predicts an <strong>inverse relation</strong> between reversal and momentum profits — across countries and across time.</p>
+      <p><strong>Implementation:</strong> We compute rolling <code>corr(Rev, Mom)</code> over 180 bars. Normally this should be <strong>negative</strong> (healthy complementary regime, shown as blue background). When it turns significantly positive (> 0.20), the two effects are resonating — this is anomalous and typically indicates crowded trades or a regime shift.</p>
+      <p><strong>Action:</strong> When corr > threshold, the composite score is automatically discounted by the penalty factor (0.60). The background turns orange as a warning. This is a <em>risk switch</em>, not a timing signal.</p>
+    </div>
+  </div>
+
+  <div class="theory" id="theoryPredC">
+    <div class="theory-header" onclick="toggleTheory('theoryPredC')">
+      <h3>Prediction (c): More Noise Trading → Stronger Reversals</h3>
+      <span class="arrow">&#9660;</span>
+    </div>
+    <div class="theory-body">
+      <p><strong>Paper (Proposition 1):</strong> As the scale of noise trades (ν<sub>z</sub>) increases, short-term reversals strengthen (S becomes more negative) and momentum attenuates (L decreases).</p>
+      <p><strong>Noise proxy for BTC:</strong> The paper uses institutional ownership and retail order imbalance. For BTC, we use: ATR% level (40%), volume anomaly (30%), and volatility regime — ATR fast/slow ratio (30%). These are combined into a z-scored noise proxy.</p>
+      <p><strong>Dynamic weighting:</strong></p>
+      <span class="eq">wRev = max(0, 0.50 × (1 + 0.50 × noiseZ))<br>wMom = max(0, 0.50 × (1 − 0.50 × noiseZ × 0.5))<br>→ normalized so wRev + wMom = 1</span>
+      <p>When noise is high → reversal weight increases, momentum weight decreases. BTC's default noise sensitivity (0.50) is higher than equities (0.40) because of its much higher retail/leverage participation.</p>
+      <p><strong>Key insight for BTC:</strong> The paper predicts BTC should exhibit <em>stronger reversals than equities</em> due to its noise-dominated market structure. Monitor AC(1) — if it's consistently negative, this prediction holds.</p>
+    </div>
+  </div>
+
+  <div class="theory" id="theoryLimits">
+    <div class="theory-header" onclick="toggleTheory('theoryLimits')">
+      <h3>Limitations & Caveats (Must Read)</h3>
+      <span class="arrow">&#9660;</span>
+    </div>
+    <div class="theory-body">
+      <p><strong>1. Cross-section vs. time-series:</strong> The paper's profits come from <em>cross-sectional decile hedge portfolios</em> (long winners, short losers). This dashboard is a <em>single-asset time-series approximation</em> — not statistically equivalent. Use as a directional bias/filter, not standalone alpha.</p>
+      <p><strong>2. BTC regime non-stationarity:</strong> BTC's market structure has changed dramatically — from retail-only (2017) to futures (2018), to institutional + spot ETF (2024). Parameters calibrated on earlier data may not apply post-2024.</p>
+      <p><strong>3. Short sample:</strong> Only ~7 years of reliable BTCUSDT data, <4 complete cycles. All statistical estimates carry wide confidence intervals.</p>
+      <p><strong>4. Halving module is narrative, not statistical:</strong> Only 4 historical halvings, confounded with macro events. Treat as visual reference only.</p>
+      <p><strong>5. Missing funding rate:</strong> The single biggest improvement would be incorporating perpetual funding rates as a noise proxy — it's more direct than ATR/volume. Not available in standard Binance kline data.</p>
+      <p><strong>6. No risk management:</strong> This is an indicator, not a strategy. It contains no stop-loss, position sizing, or portfolio construction logic.</p>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  <div class="container">
+    <p>Theory: N. Jegadeesh, J. Luo, A. Subrahmanyam, S. Titman (2025), "Short-Term Reversals and Longer-Term Momentum around the World," <em>Review of Financial Studies</em>.</p>
+    <p style="margin-top:4px">Data: <a href="https://www.binance.com" target="_blank">Binance</a> BTCUSDT | Auto-updated daily via GitHub Actions | <a href="https://github.com/hhysteric/btc-jlst-momentum" target="_blank">Source Code</a></p>
+    <p style="margin-top:4px;color:var(--fg3)">Disclaimer: For quantitative research and educational purposes only. Not investment advice. Cryptocurrency trading involves substantial risk of loss.</p>
+  </div>
+</footer>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// JLST BTC Dashboard — Main Application
+// ═══════════════════════════════════════════════════════════════
+
+const DATA_BASE = 'data/';
+let currentTF = 'daily';
+let chartData = {};
+let priceChartObj = null;
+let compChartObj = null;
+let priceSeries = null;
+let priceVolSeries = null;
+let compSeries = null;
+let revSeries = null;
+let momSeries = null;
+let ac1Series = null;
+let longMarkers = [];
+let shortMarkers = [];
+
+// ── Data loading ──
+async function loadData(tf) {
+  const url = `${DATA_BASE}btc_${tf}.json`;
+  try {
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    return await resp.json();
+  } catch (e) {
+    console.error(`Failed to load ${url}:`, e);
+    return null;
+  }
+}
+
+// ── Time formatting ──
+function tsToDate(ms) {
+  const d = new Date(ms);
+  return { year: d.getUTCFullYear(), month: d.getUTCMonth() + 1, day: d.getUTCDate() };
+}
+function fmtDate(ms) {
+  const d = new Date(ms);
+  return d.toISOString().slice(0, 10);
+}
+function fmtNum(v, digits = 3) {
+  if (v == null) return '--';
+  return Number(v).toFixed(digits);
+}
+function fmtPrice(v) {
+  if (v == null) return '--';
+  return '$' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+// ── Color helpers ──
+function compColor(v) {
+  if (v == null) return 'var(--fg2)';
+  if (v >= 1.0) return 'var(--green)';
+  if (v > 0) return 'rgba(63,185,80,0.6)';
+  if (v <= -1.0) return 'var(--red)';
+  if (v < 0) return 'rgba(248,81,73,0.6)';
+  return 'var(--fg2)';
+}
+function valClass(v) {
+  if (v == null) return 'val-neutral';
+  return v > 0 ? 'val-pos' : v < 0 ? 'val-neg' : 'val-neutral';
+}
+function statusLabel(s) {
+  const map = {
+    bullish: 'Bullish',
+    bearish: 'Bearish',
+    dead_zone: 'Dead Zone (ρ₂≈0)',
+    watch: 'Watching'
+  };
+  return map[s] || s;
+}
+function regimeLabel(s) {
+  const map = {
+    complementary: 'Complementary (corr<0, normal)',
+    normal: 'Neutral',
+    resonance: '⚠ Resonance (corr>0, anomalous)'
+  };
+  return map[s] || s;
+}
+
+// ── Chart creation ──
+function createPriceChart(container, data) {
+  container.innerHTML = '';
+  const chart = LightweightCharts.createChart(container, {
+    width: container.clientWidth,
+    height: 320,
+    layout: { background: { color: '#161b22' }, textColor: '#8b949e', fontSize: 11 },
+    grid: { vertLines: { color: 'rgba(48,54,61,0.3)' }, horzLines: { color: 'rgba(48,54,61,0.3)' } },
+    crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+    timeScale: { timeVisible: false, borderColor: '#30363d' },
+    rightPriceScale: { borderColor: '#30363d' },
+  });
+  priceChartObj = chart;
+
+  // Candlestick series
+  priceSeries = chart.addCandlestickSeries({
+    upColor: '#3fb950', downColor: '#f85149',
+    borderUpColor: '#3fb950', borderDownColor: '#f85149',
+    wickUpColor: '#3fb950', wickDownColor: '#f85149',
+  });
+
+  const d = data.data;
+  const candles = [];
+  for (let i = 0; i < d.timestamps.length; i++) {
+    // We only have close, so fake OHLC from close for now
+    // Actually we have close data, show as line-like candles
+    const t = tsToDate(d.timestamps[i]);
+    const c = d.close[i];
+    if (c == null) continue;
+    candles.push({ time: t, open: c, high: c, low: c, close: c });
+  }
+
+  // Actually build proper line area
+  chart.removeSeries(priceSeries);
+  priceSeries = chart.addAreaSeries({
+    topColor: 'rgba(247,147,26,0.3)',
+    bottomColor: 'rgba(247,147,26,0.02)',
+    lineColor: '#f7931a',
+    lineWidth: 2,
+  });
+
+  const lineData = [];
+  for (let i = 0; i < d.timestamps.length; i++) {
+    if (d.close[i] == null) continue;
+    lineData.push({ time: tsToDate(d.timestamps[i]), value: d.close[i] });
+  }
+  priceSeries.setData(lineData);
+
+  // Volume histogram
+  priceVolSeries = chart.addHistogramSeries({
+    priceFormat: { type: 'volume' },
+    priceScaleId: 'vol',
+  });
+  chart.priceScale('vol').applyOptions({
+    scaleMargins: { top: 0.8, bottom: 0 },
+  });
+
+  const volData = [];
+  for (let i = 0; i < d.timestamps.length; i++) {
+    if (d.volume[i] == null) continue;
+    const isUp = i > 0 && d.close[i] >= d.close[i - 1];
+    volData.push({
+      time: tsToDate(d.timestamps[i]),
+      value: d.volume[i],
+      color: isUp ? 'rgba(63,185,80,0.2)' : 'rgba(248,81,73,0.2)',
+    });
+  }
+  priceVolSeries.setData(volData);
+
+  // Signal markers on price chart
+  const markers = [];
+  for (let i = 0; i < d.timestamps.length; i++) {
+    if (d.long_sig[i]) {
+      markers.push({
+        time: tsToDate(d.timestamps[i]),
+        position: 'belowBar',
+        color: '#3fb950',
+        shape: 'arrowUp',
+        text: 'L',
+      });
+    }
+    if (d.short_sig[i]) {
+      markers.push({
+        time: tsToDate(d.timestamps[i]),
+        position: 'aboveBar',
+        color: '#f85149',
+        shape: 'arrowDown',
+        text: 'S',
+      });
+    }
+    if (d.cascade[i]) {
+      markers.push({
+        time: tsToDate(d.timestamps[i]),
+        position: 'aboveBar',
+        color: '#bc8cff',
+        shape: 'circle',
+        text: '⚡',
+      });
+    }
+  }
+  priceSeries.setMarkers(markers);
+
+  chart.timeScale().fitContent();
+
+  new ResizeObserver(() => {
+    chart.applyOptions({ width: container.clientWidth });
+  }).observe(container);
+}
+
+function createCompChart(container, data) {
+  container.innerHTML = '';
+  const chart = LightweightCharts.createChart(container, {
+    width: container.clientWidth,
+    height: 280,
+    layout: { background: { color: '#161b22' }, textColor: '#8b949e', fontSize: 11 },
+    grid: { vertLines: { color: 'rgba(48,54,61,0.3)' }, horzLines: { color: 'rgba(48,54,61,0.3)' } },
+    crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+    timeScale: { timeVisible: false, borderColor: '#30363d' },
+    rightPriceScale: { borderColor: '#30363d' },
+  });
+  compChartObj = chart;
+
+  const d = data.data;
+
+  // Composite as histogram
+  compSeries = chart.addHistogramSeries({
+    priceFormat: { type: 'price', precision: 3, minMove: 0.001 },
+  });
+  const compData = [];
+  for (let i = 0; i < d.timestamps.length; i++) {
+    const v = d.composite[i];
+    if (v == null) continue;
+    let color;
+    if (v >= 1.0) color = 'rgba(63,185,80,0.9)';
+    else if (v > 0) color = 'rgba(63,185,80,0.4)';
+    else if (v <= -1.0) color = 'rgba(248,81,73,0.9)';
+    else color = 'rgba(248,81,73,0.4)';
+    compData.push({ time: tsToDate(d.timestamps[i]), value: v, color });
+  }
+  compSeries.setData(compData);
+
+  // Rev line
+  revSeries = chart.addLineSeries({
+    color: '#d29922', lineWidth: 1,
+    priceScaleId: 'right',
+    lastValueVisible: false, priceLineVisible: false,
+  });
+  const revData = [];
+  for (let i = 0; i < d.timestamps.length; i++) {
+    if (d.rev[i] == null) continue;
+    revData.push({ time: tsToDate(d.timestamps[i]), value: d.rev[i] });
+  }
+  revSeries.setData(revData);
+
+  // Mom line
+  momSeries = chart.addLineSeries({
+    color: '#58a6ff', lineWidth: 1,
+    priceScaleId: 'right',
+    lastValueVisible: false, priceLineVisible: false,
+  });
+  const momData = [];
+  for (let i = 0; i < d.timestamps.length; i++) {
+    if (d.mom[i] == null) continue;
+    momData.push({ time: tsToDate(d.timestamps[i]), value: d.mom[i] });
+  }
+  momSeries.setData(momData);
+
+  // AC(1) line
+  ac1Series = chart.addLineSeries({
+    color: '#bc8cff', lineWidth: 1, lineStyle: 2,
+    priceScaleId: 'right',
+    lastValueVisible: false, priceLineVisible: false,
+  });
+  const ac1Data = [];
+  for (let i = 0; i < d.timestamps.length; i++) {
+    if (d.ac1[i] == null) continue;
+    ac1Data.push({ time: tsToDate(d.timestamps[i]), value: d.ac1[i] });
+  }
+  ac1Series.setData(ac1Data);
+
+  chart.timeScale().fitContent();
+
+  new ResizeObserver(() => {
+    chart.applyOptions({ width: container.clientWidth });
+  }).observe(container);
+}
+
+// ── Dashboard update ──
+function updateDashboard(data) {
+  const s = data.summary;
+  const p = data.params;
+
+  // Price badge
+  document.getElementById('priceVal').textContent = fmtPrice(s.price);
+  const pill = document.getElementById('statusPill');
+  pill.textContent = statusLabel(s.signal_state);
+  pill.className = 'status-pill status-' + s.signal_state;
+
+  // Core metrics
+  setMetric('m-comp', fmtNum(s.composite), valClass(s.composite));
+  setMetric('m-rev', fmtNum(s.rev), valClass(s.rev));
+  setMetric('m-mom', fmtNum(s.mom), valClass(s.mom));
+  setMetric('m-ac1', fmtNum(s.ac1), s.ac1 < 0 ? 'val-pos' : 'val-neg');
+
+  // Weights
+  setMetric('m-wrev', fmtNum(s.w_rev), 'val-info');
+  setMetric('m-wmom', fmtNum(s.w_mom), 'val-info');
+  setMetric('m-noisez', fmtNum(s.noise_z), s.noise_z > 1 ? 'val-warn' : 'val-neutral');
+  setMetric('m-volreg', fmtNum(s.vol_regime, 2), s.vol_regime > 1.15 ? 'val-warn' : 'val-neutral');
+
+  // Regime
+  setMetric('m-corr', fmtNum(s.corr_rm, 2), s.corr_rm > 0.2 ? 'val-warn' : 'val-neutral');
+  const regEl = document.getElementById('m-regime');
+  regEl.textContent = regimeLabel(s.regime);
+  regEl.className = 'metric-val ' + (s.regime === 'resonance' ? 'val-warn' : s.regime === 'complementary' ? 'val-pos' : 'val-neutral');
+
+  setMetric('m-signal', statusLabel(s.signal_state), 'status-' + s.signal_state.replace('status-', ''));
+  const sigEl = document.getElementById('m-signal');
+  sigEl.className = 'metric-val';
+  sigEl.style.color = s.signal_state === 'bullish' ? 'var(--green)' : s.signal_state === 'bearish' ? 'var(--red)' : 'var(--fg2)';
+
+  setMetric('m-shock', s.post_shock ? 'YES (Rev attenuated)' : 'No', s.post_shock ? 'val-warn' : 'val-neutral');
+
+  // BTC-specific
+  setMetric('m-halv', s.days_since_halv != null ? s.days_since_halv + ' days' : '--', 'val-neutral');
+  setMetric('m-halvactive', s.post_halv ? 'YES (Mom boosted)' : 'No', s.post_halv ? 'val-warn' : 'val-neutral');
+  setMetric('m-cascade', s.cascade ? '⚡ ACTIVE' : 'None', s.cascade ? 'val-warn' : 'val-neutral');
+  setMetric('m-update', s.last_update ? s.last_update.slice(0, 10) : '--', 'val-neutral');
+
+  // Regime bar
+  const bar = document.getElementById('regimeBar');
+  bar.className = 'regime-bar regime-' + s.regime;
+
+  // Composite latest
+  const compEl = document.getElementById('compLatest');
+  compEl.textContent = `Composite: ${fmtNum(s.composite)}`;
+  compEl.style.color = compColor(s.composite);
+
+  // Params display
+  const paramsEl = document.getElementById('paramsDisplay');
+  paramsEl.innerHTML = Object.entries(p).map(([k, v]) =>
+    `<span style="background:var(--bg3);padding:2px 8px;border-radius:4px;border:1px solid var(--border)">${k}=${v}</span>`
+  ).join('');
+}
+
+function setMetric(id, text, cls) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = text;
+  el.className = 'metric-val ' + (cls || '');
+}
+
+// ── Signal history table ──
+function updateSignalTable(data) {
+  const signals = data.signals_history || [];
+  const body = document.getElementById('sigBody');
+  document.getElementById('sigCount').textContent = `${signals.length} events`;
+
+  const rows = signals.slice().reverse().map(s => {
+    const cls = s.type === 'long' ? 'sig-long' : s.type === 'short' ? 'sig-short' : 'sig-cascade';
+    const label = s.type === 'long' ? '▲ Long' : s.type === 'short' ? '▼ Short' : '⚡ Cascade';
+    return `<tr>
+      <td>${s.date}</td>
+      <td class="${cls}">${label}</td>
+      <td>${fmtPrice(s.price)}</td>
+      <td style="color:${compColor(s.composite)}">${fmtNum(s.composite)}</td>
+      <td style="color:#d29922">${fmtNum(s.rev)}</td>
+      <td style="color:#58a6ff">${fmtNum(s.mom)}</td>
+    </tr>`;
+  });
+  body.innerHTML = rows.join('');
+}
+
+// ── Theory toggles ──
+function toggleTheory(id) {
+  const el = document.getElementById(id);
+  const header = el.querySelector('.theory-header');
+  const body = el.querySelector('.theory-body');
+  header.classList.toggle('open');
+  body.classList.toggle('open');
+}
+
+// ── Tab switching ──
+function setupTabs() {
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      const tf = tab.dataset.tf;
+      if (tf !== currentTF) {
+        currentTF = tf;
+        render(tf);
+      }
+    });
+  });
+}
+
+// ── Main render ──
+async function render(tf) {
+  if (!chartData[tf]) {
+    chartData[tf] = await loadData(tf);
+  }
+  const data = chartData[tf];
+  if (!data) {
+    document.getElementById('priceChart').innerHTML = '<div class="loading"><div>Failed to load data. Run <code>python scripts/update_data.py</code> first.</div></div>';
+    return;
+  }
+
+  createPriceChart(document.getElementById('priceChart'), data);
+  createCompChart(document.getElementById('compChart'), data);
+  updateDashboard(data);
+  updateSignalTable(data);
+
+  // Price range
+  const d = data.data;
+  if (d.timestamps.length > 0) {
+    document.getElementById('priceRange').textContent =
+      fmtDate(d.timestamps[0]) + ' — ' + fmtDate(d.timestamps[d.timestamps.length - 1]) +
+      ' (' + d.timestamps.length + ' bars)';
+  }
+}
+
+// ── Init ──
+(async function init() {
+  setupTabs();
+  // Show loading
+  document.getElementById('priceChart').innerHTML = '<div class="loading"><div class="spinner"></div><div>Loading data...</div></div>';
+  document.getElementById('compChart').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  await render('daily');
+})();
+</script>
+</body>
+</html>

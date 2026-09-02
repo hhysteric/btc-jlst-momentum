@@ -1,0 +1,11 @@
+{
+  "generated_at": "2026-09-02T06:53:20.178008+00:00",
+  "source": "Binance BTCUSDT",
+  "model": "JLST Reversal-Momentum Composite (BTC Specialized)",
+  "paper": "Jegadeesh, Luo, Subrahmanyam & Titman (2025, RFS)",
+  "timeframes": [
+    "daily",
+    "weekly",
+    "monthly"
+  ]
+}
