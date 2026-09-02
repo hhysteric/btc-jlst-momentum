@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>JLST BTC 反转-动量分析仪表盘</title>
-<meta name="description" content="基于 Jegadeesh, Luo, Subrahmanyam & Titman (2025, RFS) 的 BTC 动量与反转分析">
+<title>JLST BTC Reversal-Momentum Dashboard</title>
+<meta name="description" content="BTC momentum and reversal analysis based on Jegadeesh, Luo, Subrahmanyam & Titman (2025, RFS)">
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
 <style>
 /* ── Design tokens ── */
@@ -258,8 +258,8 @@ footer a { color: var(--accent2); text-decoration: none; }
   <div class="container header-inner">
     <div class="logo">
       <div>
-        <h1>JLST BTC 反转-动量模型</h1>
-        <div class="sub">基于 Jegadeesh, Luo, Subrahmanyam & Titman (2025, <em>Review of Financial Studies</em>)</div>
+        <h1>JLST BTC Reversal-Momentum</h1>
+        <div class="sub">Based on Jegadeesh, Luo, Subrahmanyam & Titman (2025, <em>Review of Financial Studies</em>)</div>
       </div>
     </div>
     <div class="header-right">
@@ -268,36 +268,36 @@ footer a { color: var(--accent2); text-decoration: none; }
           <div style="font-size:11px;color:var(--fg2)">BTC/USDT</div>
           <div class="price-val" id="priceVal">--</div>
         </div>
-        <div id="statusPill" class="status-pill status-watch">加载中</div>
+        <div id="statusPill" class="status-pill status-watch">Loading</div>
       </div>
-      <a href="en.html" class="hdr-btn" title="Switch to English">🌐 EN</a>
-      <button class="hdr-btn" id="themeBtn" onclick="toggleTheme()" title="切换深色/浅色主题">🌓</button>
+      <a href="index.html" class="hdr-btn" title="切换至中文">🌐 中文</a>
+      <button class="hdr-btn" id="themeBtn" onclick="toggleTheme()" title="Toggle light/dark theme">🌓</button>
     </div>
   </div>
 </header>
 
 <div class="container" style="padding-top:8px">
 
-  <!-- 时间周期选项 -->
+  <!-- Timeframe tabs -->
   <div class="tabs" id="tfTabs">
-    <button class="tab active" data-tf="daily">日线</button>
-    <button class="tab" data-tf="weekly">周线</button>
-    <button class="tab" data-tf="monthly">月线</button>
+    <button class="tab active" data-tf="daily">Daily</button>
+    <button class="tab" data-tf="weekly">Weekly</button>
+    <button class="tab" data-tf="monthly">Monthly</button>
   </div>
 
-  <!-- 图表 -->
+  <!-- Charts -->
   <div class="charts-area">
     <div class="chart-col">
       <div class="chart-panel">
         <div class="chart-title">
-          <span>BTC 价格 + 市场机制背景 + 信号</span>
+          <span>BTC Price + Regime Background + Signals</span>
           <span id="priceRange" style="font-family:var(--mono);font-size:11px;color:var(--fg3)"></span>
         </div>
         <div class="chart-box" id="priceChart" style="height:320px"></div>
       </div>
       <div class="chart-panel" style="margin-top:12px">
         <div class="chart-title">
-          <span>JLST 综合评分 + 反转 / 动量 / AC(1)</span>
+          <span>JLST Composite Score + Rev / Mom / AC(1)</span>
           <span id="compLatest" style="font-family:var(--mono);font-size:11px"></span>
         </div>
         <div class="chart-box" id="compChart" style="height:280px"></div>
@@ -305,142 +305,142 @@ footer a { color: var(--accent2); text-decoration: none; }
     </div>
   </div>
 
-  <!-- 仪表盘 -->
+  <!-- Dashboard -->
   <div class="dashboard" id="dashboard">
-    <!-- 核心指标 -->
+    <!-- Card: Core Scores -->
     <div class="card">
-      <div class="card-title">核心指标评分</div>
+      <div class="card-title">Core Indicator Scores</div>
       <div id="coreMetrics">
-        <div class="metric-row"><span class="metric-label">综合评分</span><span class="metric-val" id="m-comp">--</span></div>
-        <div class="metric-row"><span class="metric-label">反转 (Rev, ρ₁&lt;0)</span><span class="metric-val" id="m-rev">--</span></div>
-        <div class="metric-row"><span class="metric-label">动量 (Mom, ρ₃₋₁₂&gt;0)</span><span class="metric-val" id="m-mom">--</span></div>
-        <div class="metric-row"><span class="metric-label">AC(1) 自相关</span><span class="metric-val" id="m-ac1">--</span></div>
+        <div class="metric-row"><span class="metric-label">Composite</span><span class="metric-val" id="m-comp">--</span></div>
+        <div class="metric-row"><span class="metric-label">Reversal (Rev, ρ₁&lt;0)</span><span class="metric-val" id="m-rev">--</span></div>
+        <div class="metric-row"><span class="metric-label">Momentum (Mom, ρ₃₋₁₂&gt;0)</span><span class="metric-val" id="m-mom">--</span></div>
+        <div class="metric-row"><span class="metric-label">AC(1) Autocorrelation</span><span class="metric-val" id="m-ac1">--</span></div>
       </div>
     </div>
-    <!-- 动态权重 -->
+    <!-- Card: Dynamic Weights -->
     <div class="card">
-      <div class="card-title">动态权重（预测 c）</div>
+      <div class="card-title">Dynamic Weights (Prediction c)</div>
       <div>
-        <div class="metric-row"><span class="metric-label">wRev（反转权重）</span><span class="metric-val" id="m-wrev">--</span></div>
-        <div class="metric-row"><span class="metric-label">wMom（动量权重）</span><span class="metric-val" id="m-wmom">--</span></div>
-        <div class="metric-row"><span class="metric-label">噪声代理 z</span><span class="metric-val" id="m-noisez">--</span></div>
-        <div class="metric-row"><span class="metric-label">波动率机制 (ATR 快/慢)</span><span class="metric-val" id="m-volreg">--</span></div>
+        <div class="metric-row"><span class="metric-label">wRev (reversal weight)</span><span class="metric-val" id="m-wrev">--</span></div>
+        <div class="metric-row"><span class="metric-label">wMom (momentum weight)</span><span class="metric-val" id="m-wmom">--</span></div>
+        <div class="metric-row"><span class="metric-label">Noise Proxy z</span><span class="metric-val" id="m-noisez">--</span></div>
+        <div class="metric-row"><span class="metric-label">Vol Regime (ATR fast/slow)</span><span class="metric-val" id="m-volreg">--</span></div>
       </div>
     </div>
-    <!-- 机制置信度 -->
+    <!-- Card: Regime -->
     <div class="card">
-      <div class="card-title">机制置信度（预测 b）</div>
+      <div class="card-title">Regime Confidence (Prediction b)</div>
       <div>
-        <div class="metric-row"><span class="metric-label">corr(反转, 动量)</span><span class="metric-val" id="m-corr">--</span></div>
-        <div class="metric-row"><span class="metric-label">机制状态</span><span class="metric-val" id="m-regime">--</span></div>
-        <div class="metric-row"><span class="metric-label">信号状态</span><span class="metric-val" id="m-signal">--</span></div>
-        <div class="metric-row"><span class="metric-label">信息冲击窗口</span><span class="metric-val" id="m-shock">--</span></div>
+        <div class="metric-row"><span class="metric-label">corr(Rev, Mom)</span><span class="metric-val" id="m-corr">--</span></div>
+        <div class="metric-row"><span class="metric-label">Regime State</span><span class="metric-val" id="m-regime">--</span></div>
+        <div class="metric-row"><span class="metric-label">Signal State</span><span class="metric-val" id="m-signal">--</span></div>
+        <div class="metric-row"><span class="metric-label">Info Shock Window</span><span class="metric-val" id="m-shock">--</span></div>
       </div>
       <div class="regime-bar" id="regimeBar"></div>
     </div>
-    <!-- BTC 专属模块 -->
+    <!-- Card: BTC Specific -->
     <div class="card">
-      <div class="card-title">BTC 专属模块</div>
+      <div class="card-title">BTC-Specific Modules</div>
       <div>
-        <div class="metric-row"><span class="metric-label">距上次减半天数</span><span class="metric-val" id="m-halv">--</span></div>
-        <div class="metric-row"><span class="metric-label">减半增强激活</span><span class="metric-val" id="m-halvactive">--</span></div>
-        <div class="metric-row"><span class="metric-label">级联预警</span><span class="metric-val" id="m-cascade">--</span></div>
-        <div class="metric-row"><span class="metric-label">最后更新</span><span class="metric-val val-neutral" id="m-update">--</span></div>
+        <div class="metric-row"><span class="metric-label">Days Since Halving</span><span class="metric-val" id="m-halv">--</span></div>
+        <div class="metric-row"><span class="metric-label">Halving Boost Active</span><span class="metric-val" id="m-halvactive">--</span></div>
+        <div class="metric-row"><span class="metric-label">Cascade Alert</span><span class="metric-val" id="m-cascade">--</span></div>
+        <div class="metric-row"><span class="metric-label">Last Updated</span><span class="metric-val val-neutral" id="m-update">--</span></div>
       </div>
     </div>
   </div>
 
-  <!-- 参数展示 -->
+  <!-- Params display -->
   <div class="card" style="margin-bottom:16px">
-    <div class="card-title">当前参数</div>
+    <div class="card-title">Current Parameters</div>
     <div id="paramsDisplay" style="display:flex;flex-wrap:wrap;gap:8px;font-size:12px;font-family:var(--mono)"></div>
   </div>
 
-  <!-- 信号历史 -->
+  <!-- Signal History -->
   <div class="table-wrap">
     <div class="table-header">
-      <h3>信号历史</h3>
+      <h3>Signal History</h3>
       <span id="sigCount" style="font-size:12px;color:var(--fg2)"></span>
     </div>
     <div class="table-scroll">
       <table>
         <thead>
-          <tr><th>日期</th><th>类型</th><th>价格</th><th>综合评分</th><th>反转</th><th>动量</th></tr>
+          <tr><th>Date</th><th>Type</th><th>Price</th><th>Composite</th><th>Rev</th><th>Mom</th></tr>
         </thead>
         <tbody id="sigBody"></tbody>
       </table>
     </div>
   </div>
 
-  <!-- 理论说明 -->
+  <!-- Theory Sections -->
   <div class="theory" id="theoryModel">
     <div class="theory-header" onclick="toggleTheory('theoryModel')">
-      <h3>论文核心：反转与动量如何共存</h3>
+      <h3>Paper Core: How Reversal and Momentum Coexist</h3>
       <span class="arrow">&#9660;</span>
     </div>
     <div class="theory-body">
-      <p><strong>JLST 模型 (Jegadeesh, Luo, Subrahmanyam & Titman, 2025)</strong> 为资产收益中两个看似矛盾的规律提供了统一解释：</p>
-      <p><strong>1. 短期反转 (表2: ρ₁ &lt; 0)：</strong>过去1个月的收益率与未来收益率呈负相关。这是因为<strong>噪声交易者</strong>（散户投资者）造成价格暂时偏离基本面。风险厌恶的做市商为吸收这些噪声需求而要求溢价，导致价格过度反应后回归。</p>
-      <span class="eq">r<sub>t</sub> = α + ρ₁·r<sub>t−1</sub> + ρ₂·r<sub>t−2</sub> + … + ρ₁₂·r<sub>t−12</sub> + ε<sub>t</sub> &nbsp;&nbsp;其中 ρ₁ &lt; 0</span>
-      <p><strong>2. 中长期动量 (表2: ρ₃…ρ₁₂ &gt; 0)：</strong>滞后3-12个月的收益率具有正向预测能力。这源于<strong>主动投资者对非自身产生的信息反应不足</strong>（一种过度自信，参见 Odean 1998）。价格逐步吸纳基本面信息，产生动量效应。</p>
-      <p><strong>3. 过渡区间 (表2: ρ₂ ≈ 0)：</strong>第2个月滞后的回归系数不显著——这是反转力量与动量力量大致抵消的死区。</p>
-      <p><strong>命题2（跳期效应）：</strong>在形成期和持有期之间跳过一个周期可增强动量：L* = L − Cov(P₂−P₀, P₃−P₂) &gt; L。这是因为跳期消除了噪声交易者引起的反转所造成的负协方差。</p>
-      <p><strong>BTC 应用：</strong>BTC 的高散户参与度和杠杆放大了噪声交易渠道，预示着<em>比传统股票更强的反转效应</em>。24/7 全天候市场和极端尾部事件需要调整参数（30天为一个月、对数收益率、更短的标准化窗口）。</p>
+      <p><strong>The JLST Model (Jegadeesh, Luo, Subrahmanyam & Titman, 2025)</strong> provides a unified explanation for two seemingly contradictory patterns in asset returns:</p>
+      <p><strong>1. Short-term reversals (Table 2: ρ₁ &lt; 0):</strong> Past 1-month returns negatively predict future returns. This arises because <strong>noise traders</strong> (retail investors) create temporary price deviations from fundamentals. Risk-averse market makers demand a premium to absorb these noise demands, causing prices to overshoot and then revert.</p>
+      <span class="eq">r<sub>t</sub> = α + ρ₁·r<sub>t−1</sub> + ρ₂·r<sub>t−2</sub> + … + ρ₁₂·r<sub>t−12</sub> + ε<sub>t</sub> &nbsp;&nbsp;where ρ₁ &lt; 0</span>
+      <p><strong>2. Longer-term momentum (Table 2: ρ₃…ρ₁₂ &gt; 0):</strong> Returns at lags 3–12 months are positively predictive. This stems from <strong>active investors' underreaction</strong> to information they did not produce (a form of overconfidence per Odean 1998). Prices gradually incorporate fundamental information, creating momentum.</p>
+      <p><strong>3. The transition (Table 2: ρ₂ ≈ 0):</strong> The 2-month lag coefficient is insignificant — a dead zone where reversal forces and momentum forces roughly cancel out.</p>
+      <p><strong>Proposition 2 (Skip effect):</strong> Skipping one period between formation and holding periods enhances momentum: L* = L − Cov(P₂−P₀, P₃−P₂) &gt; L. This is because skipping removes the negative covariance caused by noise-trader-induced reversals.</p>
+      <p><strong>BTC Application:</strong> BTC's high retail participation and leverage amplify the noise trading channel, predicting <em>stronger reversals</em> than in traditional equities. The 24/7 market and extreme tail events require adapted parameters (30-day months, log returns, shorter normalization windows).</p>
     </div>
   </div>
 
   <div class="theory" id="theoryPredA">
     <div class="theory-header" onclick="toggleTheory('theoryPredA')">
-      <h3>预测 (a)：信息冲击削弱反转</h3>
+      <h3>Prediction (a): Information Shocks Attenuate Reversals</h3>
       <span class="arrow">&#9660;</span>
     </div>
     <div class="theory-body">
-      <p><strong>论文（命题3）：</strong>在足够精确的公开信号（如财报公告）之后，短期反转效应会减弱。对信号的反应不足所产生的公告后漂移超过了噪声交易者引起的反转。</p>
-      <p><strong>BTC 适配：</strong>BTC 没有财报公告。我们用<strong>信息冲击</strong>替代：|对数收益率| &gt; 2.5× ATR% 且 成交量 &gt; 2× 平均成交量的事件。例如：ETF 获批、监管新闻、交易所崩溃。</p>
-      <p><strong>实现方式：</strong>在冲击发生后的10根K线内，反转分量 (Rev) 乘以 0.40 的衰减因子。含义是：<em>重大信息事件刚发生后，不要依赖"超卖反弹"逻辑——市场正在消化真实信息，而非仅仅是噪声。</em></p>
-      <p><strong>实证支持：</strong>论文表3显示，财报公告后1个月内反转效应减弱约68%（c = +0.025 vs ρ₁ = −0.037）。</p>
+      <p><strong>Paper (Proposition 3):</strong> After sufficiently precise public signals (earnings announcements), short-term reversals attenuate. The underreaction to the signal creates post-announcement drift that more than offsets noise-trader-induced reversals.</p>
+      <p><strong>BTC Adaptation:</strong> BTC has no earnings announcements. We substitute <strong>information shocks</strong>: events where |log return| &gt; 2.5× ATR% AND volume &gt; 2× average volume. Examples: ETF approvals, regulatory news, exchange collapses.</p>
+      <p><strong>Implementation:</strong> Within 10 bars after a shock, the reversal component (Rev) is multiplied by 0.40. This means: <em>don't rely on "oversold bounce" logic right after a major information event — the market is absorbing genuine news, not just noise.</em></p>
+      <p><strong>Empirical support:</strong> Table 3 of the paper shows reversals attenuate by ~68% in the month after earnings announcements (c = +0.025 vs ρ₁ = −0.037).</p>
     </div>
   </div>
 
   <div class="theory" id="theoryPredB">
     <div class="theory-header" onclick="toggleTheory('theoryPredB')">
-      <h3>预测 (b)：反转与动量收益呈负相关</h3>
+      <h3>Prediction (b): Reversal and Momentum Profits Are Negatively Correlated</h3>
       <span class="arrow">&#9660;</span>
     </div>
     <div class="theory-body">
-      <p><strong>论文：</strong>由于噪声交易的外生变化会同时增强反转、削弱动量，模型预测反转收益与动量收益之间存在<strong>反向关系</strong>——跨国家、跨时间均成立。</p>
-      <p><strong>实现方式：</strong>我们计算滚动 <code>corr(Rev, Mom)</code>，窗口为180根K线。正常情况下应为<strong>负值</strong>（健康的互补机制，以蓝色背景显示）。当相关性显著转正（&gt; 0.20）时，两种效应产生共振——这是异常现象，通常表示交易拥挤或机制转换。</p>
-      <p><strong>处理：</strong>当 corr &gt; 阈值时，综合评分自动乘以惩罚因子（0.60）。背景变为橙色作为警告。这是一个<em>风险开关</em>，而非择时信号。</p>
+      <p><strong>Paper:</strong> Because exogenous shifts in noise trading generate stronger reversals and weaker momentum, the model predicts an <strong>inverse relation</strong> between reversal and momentum profits — across countries and across time.</p>
+      <p><strong>Implementation:</strong> We compute rolling <code>corr(Rev, Mom)</code> over 180 bars. Normally this should be <strong>negative</strong> (healthy complementary regime, shown as blue background). When it turns significantly positive (&gt; 0.20), the two effects are resonating — this is anomalous and typically indicates crowded trades or a regime shift.</p>
+      <p><strong>Action:</strong> When corr &gt; threshold, the composite score is automatically discounted by the penalty factor (0.60). The background turns orange as a warning. This is a <em>risk switch</em>, not a timing signal.</p>
     </div>
   </div>
 
   <div class="theory" id="theoryPredC">
     <div class="theory-header" onclick="toggleTheory('theoryPredC')">
-      <h3>预测 (c)：噪声交易越多 → 反转越强</h3>
+      <h3>Prediction (c): More Noise Trading → Stronger Reversals</h3>
       <span class="arrow">&#9660;</span>
     </div>
     <div class="theory-body">
-      <p><strong>论文（命题1）：</strong>随着噪声交易规模 (ν<sub>z</sub>) 增加，短期反转增强（S 变得更负），动量减弱（L 降低）。</p>
-      <p><strong>BTC 噪声代理：</strong>论文使用机构持股和散户订单失衡。对于 BTC，我们使用：ATR% 水平（权重40%）、成交量异常（权重30%）以及波动率机制——ATR 快/慢比率（权重30%）。这些被组合为 z 标准化的噪声代理。</p>
-      <p><strong>动态权重调整：</strong></p>
-      <span class="eq">wRev = max(0, 0.50 × (1 + 0.50 × noiseZ))<br>wMom = max(0, 0.50 × (1 − 0.50 × noiseZ × 0.5))<br>→ 归一化使 wRev + wMom = 1</span>
-      <p>噪声高时 → 反转权重增加，动量权重降低。BTC 的默认噪声敏感度（0.50）高于股票（0.40），因为其散户/杠杆参与度远高于传统市场。</p>
-      <p><strong>BTC 关键洞察：</strong>论文预测 BTC 应当表现出<em>比股票更强的反转效应</em>，这源于其噪声主导的市场结构。关注 AC(1)——如果持续为负，则该预测成立。</p>
+      <p><strong>Paper (Proposition 1):</strong> As the scale of noise trades (ν<sub>z</sub>) increases, short-term reversals strengthen (S becomes more negative) and momentum attenuates (L decreases).</p>
+      <p><strong>Noise proxy for BTC:</strong> The paper uses institutional ownership and retail order imbalance. For BTC, we use: ATR% level (40%), volume anomaly (30%), and volatility regime — ATR fast/slow ratio (30%). These are combined into a z-scored noise proxy.</p>
+      <p><strong>Dynamic weighting:</strong></p>
+      <span class="eq">wRev = max(0, 0.50 × (1 + 0.50 × noiseZ))<br>wMom = max(0, 0.50 × (1 − 0.50 × noiseZ × 0.5))<br>→ normalized so wRev + wMom = 1</span>
+      <p>When noise is high → reversal weight increases, momentum weight decreases. BTC's default noise sensitivity (0.50) is higher than equities (0.40) because of its much higher retail/leverage participation.</p>
+      <p><strong>Key insight for BTC:</strong> The paper predicts BTC should exhibit <em>stronger reversals than equities</em> due to its noise-dominated market structure. Monitor AC(1) — if it's consistently negative, this prediction holds.</p>
     </div>
   </div>
 
   <div class="theory" id="theoryLimits">
     <div class="theory-header" onclick="toggleTheory('theoryLimits')">
-      <h3>局限性与注意事项（必读）</h3>
+      <h3>Limitations & Caveats (Must Read)</h3>
       <span class="arrow">&#9660;</span>
     </div>
     <div class="theory-body">
-      <p><strong>1. 横截面 vs. 时间序列：</strong>论文的收益来自<em>横截面十分位对冲组合</em>（做多赢家，做空输家）。本仪表盘是<em>单一资产的时间序列近似</em>——统计上并不等价。请作为方向性偏向/过滤器使用，而非独立的 alpha 来源。</p>
-      <p><strong>2. BTC 机制非平稳性：</strong>BTC 的市场结构已发生巨大变化——从纯散户（2017）到期货（2018），再到机构 + 现货 ETF（2024）。基于早期数据校准的参数可能不适用于2024年后。</p>
-      <p><strong>3. 样本量短：</strong>仅约7年可靠的 BTCUSDT 数据，不到4个完整周期。所有统计估计均有较宽的置信区间。</p>
-      <p><strong>4. 减半模块是叙事性的，非统计性的：</strong>仅有4次历史减半事件，且与宏观事件混淆。仅作为视觉参考。</p>
-      <p><strong>5. 缺少资金费率：</strong>最大的改进空间是将永续合约资金费率纳入噪声代理——它比 ATR/成交量更直接。标准 Binance K线数据中不包含此数据。</p>
-      <p><strong>6. 无风险管理：</strong>这是一个指标，不是策略。不包含止损、仓位管理或组合构建逻辑。</p>
+      <p><strong>1. Cross-section vs. time-series:</strong> The paper's profits come from <em>cross-sectional decile hedge portfolios</em> (long winners, short losers). This dashboard is a <em>single-asset time-series approximation</em> — not statistically equivalent. Use as a directional bias/filter, not standalone alpha.</p>
+      <p><strong>2. BTC regime non-stationarity:</strong> BTC's market structure has changed dramatically — from retail-only (2017) to futures (2018), to institutional + spot ETF (2024). Parameters calibrated on earlier data may not apply post-2024.</p>
+      <p><strong>3. Short sample:</strong> Only ~7 years of reliable BTCUSDT data, &lt;4 complete cycles. All statistical estimates carry wide confidence intervals.</p>
+      <p><strong>4. Halving module is narrative, not statistical:</strong> Only 4 historical halvings, confounded with macro events. Treat as visual reference only.</p>
+      <p><strong>5. Missing funding rate:</strong> The single biggest improvement would be incorporating perpetual funding rates as a noise proxy — it's more direct than ATR/volume. Not available in standard Binance kline data.</p>
+      <p><strong>6. No risk management:</strong> This is an indicator, not a strategy. It contains no stop-loss, position sizing, or portfolio construction logic.</p>
     </div>
   </div>
 
@@ -448,15 +448,15 @@ footer a { color: var(--accent2); text-decoration: none; }
 
 <footer>
   <div class="container">
-    <p>理论依据：N. Jegadeesh, J. Luo, A. Subrahmanyam, S. Titman (2025)，"Short-Term Reversals and Longer-Term Momentum around the World"，<em>Review of Financial Studies</em>。</p>
-    <p style="margin-top:4px">数据来源：<a href="https://www.binance.com" target="_blank">Binance</a> BTCUSDT | 通过 GitHub Actions 每日自动更新 | <a href="https://github.com/hhysteric/btc-jlst-momentum" target="_blank">源代码</a></p>
-    <p style="margin-top:4px;color:var(--fg3)">免责声明：仅供量化研究和教育用途，不构成投资建议。加密货币交易存在重大亏损风险。</p>
+    <p>Theory: N. Jegadeesh, J. Luo, A. Subrahmanyam, S. Titman (2025), "Short-Term Reversals and Longer-Term Momentum around the World," <em>Review of Financial Studies</em>.</p>
+    <p style="margin-top:4px">Data: <a href="https://www.binance.com" target="_blank">Binance</a> BTCUSDT | Auto-updated daily via GitHub Actions | <a href="https://github.com/hhysteric/btc-jlst-momentum" target="_blank">Source Code</a></p>
+    <p style="margin-top:4px;color:var(--fg3)">Disclaimer: For quantitative research and educational purposes only. Not investment advice. Cryptocurrency trading involves substantial risk of loss.</p>
   </div>
 </footer>
 
 <script>
 // ═══════════════════════════════════════════════════════════════
-// JLST BTC 仪表盘 — 主程序
+// JLST BTC Dashboard — Main Application (English)
 // ═══════════════════════════════════════════════════════════════
 
 const DATA_BASE = 'data/';
@@ -542,18 +542,18 @@ function valClass(v) {
 }
 function statusLabel(s) {
   const map = {
-    bullish: '看多',
-    bearish: '看空',
-    dead_zone: '死区 (ρ₂≈0)',
-    watch: '观望'
+    bullish: 'Bullish',
+    bearish: 'Bearish',
+    dead_zone: 'Dead Zone (ρ₂≈0)',
+    watch: 'Watching'
   };
   return map[s] || s;
 }
 function regimeLabel(s) {
   const map = {
-    complementary: '互补（corr<0，正常）',
-    normal: '中性',
-    resonance: '⚠ 共振（corr>0，异常）'
+    complementary: 'Complementary (corr<0, normal)',
+    normal: 'Neutral',
+    resonance: '⚠ Resonance (corr>0, anomalous)'
   };
   return map[s] || s;
 }
@@ -616,13 +616,13 @@ function createPriceChart(container, data) {
     if (d.long_sig[i]) {
       markers.push({
         time: tsToDate(d.timestamps[i]),
-        position: 'belowBar', color: '#3fb950', shape: 'arrowUp', text: '多',
+        position: 'belowBar', color: '#3fb950', shape: 'arrowUp', text: 'L',
       });
     }
     if (d.short_sig[i]) {
       markers.push({
         time: tsToDate(d.timestamps[i]),
-        position: 'aboveBar', color: '#f85149', shape: 'arrowDown', text: '空',
+        position: 'aboveBar', color: '#f85149', shape: 'arrowDown', text: 'S',
       });
     }
     if (d.cascade[i]) {
@@ -752,12 +752,12 @@ function updateDashboard(data) {
   sigEl.className = 'metric-val';
   sigEl.style.color = s.signal_state === 'bullish' ? 'var(--green)' : s.signal_state === 'bearish' ? 'var(--red)' : 'var(--fg2)';
 
-  setMetric('m-shock', s.post_shock ? '是（Rev 已衰减）' : '否', s.post_shock ? 'val-warn' : 'val-neutral');
+  setMetric('m-shock', s.post_shock ? 'YES (Rev attenuated)' : 'No', s.post_shock ? 'val-warn' : 'val-neutral');
 
   // BTC-specific
-  setMetric('m-halv', s.days_since_halv != null ? s.days_since_halv + ' 天' : '--', 'val-neutral');
-  setMetric('m-halvactive', s.post_halv ? '是（Mom 已增强）' : '否', s.post_halv ? 'val-warn' : 'val-neutral');
-  setMetric('m-cascade', s.cascade ? '⚡ 激活' : '无', s.cascade ? 'val-warn' : 'val-neutral');
+  setMetric('m-halv', s.days_since_halv != null ? s.days_since_halv + ' days' : '--', 'val-neutral');
+  setMetric('m-halvactive', s.post_halv ? 'YES (Mom boosted)' : 'No', s.post_halv ? 'val-warn' : 'val-neutral');
+  setMetric('m-cascade', s.cascade ? '⚡ ACTIVE' : 'None', s.cascade ? 'val-warn' : 'val-neutral');
   setMetric('m-update', s.last_update ? s.last_update.slice(0, 10) : '--', 'val-neutral');
 
   // Regime bar
@@ -766,7 +766,7 @@ function updateDashboard(data) {
 
   // Composite latest
   const compEl = document.getElementById('compLatest');
-  compEl.textContent = `综合评分: ${fmtNum(s.composite)}`;
+  compEl.textContent = `Composite: ${fmtNum(s.composite)}`;
   compEl.style.color = compColor(s.composite);
 
   // Params display
@@ -787,11 +787,11 @@ function setMetric(id, text, cls) {
 function updateSignalTable(data) {
   const signals = data.signals_history || [];
   const body = document.getElementById('sigBody');
-  document.getElementById('sigCount').textContent = `${signals.length} 个事件`;
+  document.getElementById('sigCount').textContent = `${signals.length} events`;
 
   const rows = signals.slice().reverse().map(s => {
     const cls = s.type === 'long' ? 'sig-long' : s.type === 'short' ? 'sig-short' : 'sig-cascade';
-    const label = s.type === 'long' ? '▲ 做多' : s.type === 'short' ? '▼ 做空' : '⚡ 级联';
+    const label = s.type === 'long' ? '▲ Long' : s.type === 'short' ? '▼ Short' : '⚡ Cascade';
     return `<tr>
       <td>${s.date}</td>
       <td class="${cls}">${label}</td>
@@ -835,7 +835,7 @@ async function render(tf) {
   }
   const data = chartData[tf];
   if (!data) {
-    document.getElementById('priceChart').innerHTML = '<div class="loading"><div>加载数据失败。请先运行 <code>python scripts/update_data.py</code>。</div></div>';
+    document.getElementById('priceChart').innerHTML = '<div class="loading"><div>Failed to load data. Run <code>python scripts/update_data.py</code> first.</div></div>';
     return;
   }
 
@@ -849,14 +849,14 @@ async function render(tf) {
   if (d.timestamps.length > 0) {
     document.getElementById('priceRange').textContent =
       fmtDate(d.timestamps[0]) + ' — ' + fmtDate(d.timestamps[d.timestamps.length - 1]) +
-      '（' + d.timestamps.length + ' 根K线）';
+      ' (' + d.timestamps.length + ' bars)';
   }
 }
 
 // ── Init ──
 (async function init() {
   setupTabs();
-  document.getElementById('priceChart').innerHTML = '<div class="loading"><div class="spinner"></div><div>加载数据中...</div></div>';
+  document.getElementById('priceChart').innerHTML = '<div class="loading"><div class="spinner"></div><div>Loading data...</div></div>';
   document.getElementById('compChart').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
   await render('daily');
 })();
