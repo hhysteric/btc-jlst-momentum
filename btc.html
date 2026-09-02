@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>JLST BTC 反转-动量分析仪表盘</title>
-<meta name="description" content="基于 Jegadeesh, Luo, Subrahmanyam & Titman (2025, RFS) 的 BTC 动量与反转分析">
+<title>JLST BTC v2 · BTC 适应版仪表盘</title>
+<meta name="description" content="JLST v2 BTC 适应版 — 基于回测标定参数 + 资金费率噪声代理">
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
 <style>
 /* ── Design tokens ── */
@@ -53,6 +53,13 @@ header {
   letter-spacing: -0.02em;
 }
 .logo .sub { font-size: 11px; color: var(--fg2); }
+.v2-badge {
+  display: inline-block; padding: 2px 8px; border-radius: 4px;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.05em;
+  background: rgba(247,147,26,0.15); color: var(--accent);
+  border: 1px solid rgba(247,147,26,0.3);
+  vertical-align: middle; margin-left: 6px;
+}
 
 .header-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 
@@ -113,7 +120,7 @@ header {
   display: flex; align-items: center; justify-content: space-between;
   transition: border-color 0.3s;
 }
-.chart-box { width: 100%; }
+.chart-box { width: 100%; position: relative; }
 
 /* ── Dashboard cards ── */
 .dashboard {
@@ -152,6 +159,17 @@ header {
 .regime-complementary { background: linear-gradient(90deg, var(--accent2), #1f6feb); }
 .regime-normal { background: var(--fg3); }
 .regime-resonance { background: linear-gradient(90deg, var(--orange), #da3633); }
+
+/* ── Parameter comparison table ── */
+.param-table { width: 100%; font-size: 12px; border-collapse: collapse; }
+.param-table th {
+  text-align: left; padding: 4px 6px; font-size: 11px;
+  color: var(--fg2); text-transform: uppercase; letter-spacing: 0.05em;
+  border-bottom: 1px solid var(--border);
+}
+.param-table td { padding: 4px 6px; font-family: var(--mono); font-size: 12px; }
+.param-table td.changed { color: var(--accent); font-weight: 600; }
+.param-table tr:nth-child(even) { background: rgba(48,54,61,0.15); }
 
 /* ── Signal history table ── */
 .table-wrap {
@@ -219,7 +237,7 @@ footer a { color: var(--accent2); text-decoration: none; }
 /* ── Loading ── */
 .loading {
   display: flex; flex-direction: column; align-items: center;
-  justify-content: center; height: 300px; color: var(--fg2);
+  justify-content: center; height: 200px; color: var(--fg2);
 }
 .spinner {
   width: 32px; height: 32px; border: 3px solid var(--border);
@@ -241,18 +259,8 @@ footer a { color: var(--accent2); text-decoration: none; }
 ::-webkit-scrollbar-track { background: var(--bg); }
 ::-webkit-scrollbar-thumb { background: var(--fg3); border-radius: 3px; }
 
-/* ── Tooltip ── */
-.chart-tooltip {
-  position: absolute; background: var(--bg2); border: 1px solid var(--border);
-  border-radius: 6px; padding: 8px 12px; font-size: 12px;
-  pointer-events: none; z-index: 50; display: none;
-  box-shadow: var(--shadow);
-}
-
 /* ── Indicator toggle buttons ── */
-.ind-toggles {
-  display: flex; gap: 4px; flex-wrap: wrap;
-}
+.ind-toggles { display: flex; gap: 4px; flex-wrap: wrap; }
 .ind-btn {
   display: inline-flex; align-items: center; gap: 4px;
   padding: 2px 8px; border-radius: 4px; cursor: pointer;
@@ -268,7 +276,7 @@ footer a { color: var(--accent2); text-decoration: none; }
 .ind-btn.off .dot { background: var(--fg3) !important; }
 .ind-btn:hover { border-color: var(--fg3); }
 
-/* ── Fullscreen overlay ── */
+/* ── Fullscreen overlay (3-chart with dual splitters) ── */
 .charts-fullscreen {
   position: fixed; inset: 0; z-index: 200;
   background: var(--bg); display: flex; flex-direction: column;
@@ -288,6 +296,7 @@ footer a { color: var(--accent2); text-decoration: none; }
 }
 .charts-fullscreen .fs-price { position: relative; overflow: hidden; }
 .charts-fullscreen .fs-comp  { position: relative; overflow: hidden; }
+.charts-fullscreen .fs-fund  { position: relative; overflow: hidden; }
 .fs-exit-btn {
   padding: 4px 14px; border-radius: 6px; cursor: pointer;
   font-size: 12px; font-weight: 600;
@@ -312,7 +321,6 @@ footer a { color: var(--accent2); text-decoration: none; }
 .fs-splitter:hover::after, .fs-splitter.active::after { background: #000; }
 
 /* ── TradingView-style chart legend overlay ── */
-.chart-box { position: relative; }
 .chart-legend {
   position: absolute; top: 8px; left: 12px; z-index: 10;
   font-family: var(--mono); font-size: 11px; line-height: 1.5;
@@ -334,6 +342,8 @@ footer a { color: var(--accent2); text-decoration: none; }
 .chart-legend .v-ac1 { color: #bc8cff; }
 .chart-legend .v-comp-pos { color: #3fb950; }
 .chart-legend .v-comp-neg { color: #f85149; }
+.chart-legend .v-fund-pos { color: #f85149; }
+.chart-legend .v-fund-neg { color: #3fb950; }
 </style>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
@@ -344,8 +354,8 @@ footer a { color: var(--accent2); text-decoration: none; }
   <div class="container header-inner">
     <div class="logo">
       <div>
-        <h1>JLST BTC 反转-动量模型</h1>
-        <div class="sub">基于 Jegadeesh, Luo, Subrahmanyam & Titman (2025, <em>Review of Financial Studies</em>)</div>
+        <h1>JLST BTC 反转-动量模型 <span class="v2-badge">v2</span></h1>
+        <div class="sub">BTC 适应版 · 回测标定参数 + 资金费率噪声代理</div>
       </div>
     </div>
     <div class="header-right">
@@ -356,8 +366,8 @@ footer a { color: var(--accent2); text-decoration: none; }
         </div>
         <div id="statusPill" class="status-pill status-watch">加载中</div>
       </div>
-      <a href="btc.html" class="hdr-btn" title="BTC 适应版 v2" style="border-color:var(--accent);color:var(--accent)">🔬 BTC v2</a>
-      <a href="en.html" class="hdr-btn" title="Switch to English">🌐 EN</a>
+      <a href="index.html" class="hdr-btn" title="切回论文版">📊 论文版 v1</a>
+      <a href="btc-en.html" class="hdr-btn" title="Switch to English">🌐 EN</a>
       <button class="hdr-btn" id="themeBtn" onclick="toggleTheme()" title="切换深色/浅色主题">🌓</button>
     </div>
   </div>
@@ -372,22 +382,22 @@ footer a { color: var(--accent2); text-decoration: none; }
     <button class="tab" data-tf="monthly">月线</button>
   </div>
 
-  <!-- 图表 -->
+  <!-- 三图区域 -->
   <div class="charts-area" id="chartsArea">
     <div class="chart-col">
       <div class="chart-panel">
         <div class="chart-title">
-          <span>BTC 价格 + 市场机制背景 + 信号</span>
+          <span>BTC 价格 + 信号标记</span>
           <div style="display:flex;align-items:center;gap:8px">
             <span id="priceRange" style="font-family:var(--mono);font-size:11px;color:var(--fg3)"></span>
             <button class="ind-btn" onclick="toggleFullscreen()" title="全屏" id="fsBtn">⛶ 全屏</button>
           </div>
         </div>
-        <div class="chart-box" id="priceChart" style="height:320px"></div>
+        <div class="chart-box" id="priceChart" style="height:280px"></div>
       </div>
       <div class="chart-panel" style="margin-top:12px">
         <div class="chart-title">
-          <span>JLST 综合评分</span>
+          <span>JLST v2 综合评分</span>
           <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
             <div class="ind-toggles" id="indToggles">
               <button class="ind-btn" data-key="composite" onclick="toggleIndicator('composite')"><span class="dot" style="background:#3fb950"></span>综合</button>
@@ -398,7 +408,14 @@ footer a { color: var(--accent2); text-decoration: none; }
             <span id="compLatest" style="font-family:var(--mono);font-size:11px"></span>
           </div>
         </div>
-        <div class="chart-box" id="compChart" style="height:280px"></div>
+        <div class="chart-box" id="compChart" style="height:220px"></div>
+      </div>
+      <div class="chart-panel" style="margin-top:12px">
+        <div class="chart-title">
+          <span>资金费率 (Funding Rate)</span>
+          <span id="fundLatest" style="font-family:var(--mono);font-size:11px;color:var(--fg2)"></span>
+        </div>
+        <div class="chart-box" id="fundChart" style="height:120px"></div>
       </div>
     </div>
   </div>
@@ -407,17 +424,18 @@ footer a { color: var(--accent2); text-decoration: none; }
   <div class="dashboard" id="dashboard">
     <!-- 核心指标 -->
     <div class="card">
-      <div class="card-title">核心指标评分</div>
+      <div class="card-title">核心指标评分 (v2)</div>
       <div id="coreMetrics">
         <div class="metric-row"><span class="metric-label">综合评分</span><span class="metric-val" id="m-comp">--</span></div>
-        <div class="metric-row"><span class="metric-label">反转 (Rev, ρ₁&lt;0)</span><span class="metric-val" id="m-rev">--</span></div>
-        <div class="metric-row"><span class="metric-label">动量 (Mom, ρ₃₋₁₂&gt;0)</span><span class="metric-val" id="m-mom">--</span></div>
+        <div class="metric-row"><span class="metric-label">反转 (Rev)</span><span class="metric-val" id="m-rev">--</span></div>
+        <div class="metric-row"><span class="metric-label">动量 (Mom)</span><span class="metric-val" id="m-mom">--</span></div>
         <div class="metric-row"><span class="metric-label">AC(1) 自相关</span><span class="metric-val" id="m-ac1">--</span></div>
+        <div class="metric-row"><span class="metric-label">资金费率</span><span class="metric-val" id="m-funding">--</span></div>
       </div>
     </div>
     <!-- 动态权重 -->
     <div class="card">
-      <div class="card-title">动态权重（预测 c）</div>
+      <div class="card-title">动态权重 (v2 噪声代理)</div>
       <div>
         <div class="metric-row"><span class="metric-label">wRev（反转权重）</span><span class="metric-val" id="m-wrev">--</span></div>
         <div class="metric-row"><span class="metric-label">wMom（动量权重）</span><span class="metric-val" id="m-wmom">--</span></div>
@@ -427,7 +445,7 @@ footer a { color: var(--accent2); text-decoration: none; }
     </div>
     <!-- 机制置信度 -->
     <div class="card">
-      <div class="card-title">机制置信度（预测 b）</div>
+      <div class="card-title">机制置信度</div>
       <div>
         <div class="metric-row"><span class="metric-label">corr(反转, 动量)</span><span class="metric-val" id="m-corr">--</span></div>
         <div class="metric-row"><span class="metric-label">机制状态</span><span class="metric-val" id="m-regime">--</span></div>
@@ -448,16 +466,21 @@ footer a { color: var(--accent2); text-decoration: none; }
     </div>
   </div>
 
-  <!-- 参数展示 -->
-  <div class="card" style="margin-bottom:16px">
-    <div class="card-title">当前参数</div>
-    <div id="paramsDisplay" style="display:flex;flex-wrap:wrap;gap:8px;font-size:12px;font-family:var(--mono)"></div>
+  <!-- v1 vs v2 参数对比 -->
+  <div class="card" style="margin-bottom:16px" id="paramCompareCard">
+    <div class="card-title">v1 vs v2 参数对比</div>
+    <table class="param-table" id="paramCompare">
+      <thead>
+        <tr><th>参数</th><th>v1（论文原版）</th><th>v2（BTC 适配）</th><th>说明</th></tr>
+      </thead>
+      <tbody id="paramCompareBody"></tbody>
+    </table>
   </div>
 
   <!-- 信号历史 -->
   <div class="table-wrap">
     <div class="table-header">
-      <h3>信号历史</h3>
+      <h3>v2 信号历史</h3>
       <span id="sigCount" style="font-size:12px;color:var(--fg2)"></span>
     </div>
     <div class="table-scroll">
@@ -470,7 +493,25 @@ footer a { color: var(--accent2); text-decoration: none; }
     </div>
   </div>
 
-  <!-- 理论说明 -->
+  <!-- v2 说明 -->
+  <div class="theory" id="theoryV2">
+    <div class="theory-header" onclick="toggleTheory('theoryV2')">
+      <h3>v2 BTC 适应版说明</h3>
+      <span class="arrow">&#9660;</span>
+    </div>
+    <div class="theory-body">
+      <p><strong>为什么需要 v2？</strong>v1 直接搬用了论文的股票市场参数（月线级别窗口、机构持仓噪声代理）。BTC 24/7 交易、高波动、散户/杠杆主导的市场结构与传统股票有本质区别。v2 通过 BTC 历史数据回测来标定最优参数。</p>
+      <p><strong>1. 回测标定参数：</strong>在 2017–2023 年 BTC 日线数据上进行网格搜索，以"信号方向命中率 × 风险调整收益（Sharpe）"为目标函数，优化反转窗口、动量窗口、跳期、标准化窗口、入场阈值和噪声敏感度。2024–2026 年数据作为样本外验证。</p>
+      <p><strong>2. 资金费率噪声代理：</strong>论文用机构持仓比/散户资金流衡量噪声交易者密度。BTC 最直接的替代品是永续合约资金费率：</p>
+      <span class="eq">v2 noise_z = 0.25×ATR + 0.25×量比 + 0.20×机制 + 0.30×|资金费率|_z</span>
+      <p>资金费率高 → 杠杆/投机高 → 噪声高 → 反转权重升高。这比纯 ATR 更直接反映"噪声交易者"密度。</p>
+      <p><strong>3. 入场阈值降低：</strong>回测显示 BTC 使用更低的入场阈值（0.5 vs 1.0）能捕获更多有效信号，因为 BTC 的反转-动量合力经常不会达到论文默认的 ±1.0 极端值。</p>
+      <p><strong>4. 噪声敏感度降低：</strong>v2 的 noiseGain（0.3 vs 0.5）更保守，避免在 BTC 本就高波动的环境下过度调整权重。</p>
+      <p><strong>⚠️ 注意：</strong>回测优化存在过拟合风险。样本外（2024+）表现可能弱于训练期。v2 参数应视为"对 BTC 市场结构更合理的初始猜测"，而非保证盈利的交易系统。</p>
+    </div>
+  </div>
+
+  <!-- 原版论文理论 -->
   <div class="theory" id="theoryModel">
     <div class="theory-header" onclick="toggleTheory('theoryModel')">
       <h3>论文核心：反转与动量如何共存</h3>
@@ -478,52 +519,10 @@ footer a { color: var(--accent2); text-decoration: none; }
     </div>
     <div class="theory-body">
       <p><strong>JLST 模型 (Jegadeesh, Luo, Subrahmanyam & Titman, 2025)</strong> 为资产收益中两个看似矛盾的规律提供了统一解释：</p>
-      <p><strong>1. 短期反转 (表2: ρ₁ &lt; 0)：</strong>过去1个月的收益率与未来收益率呈负相关。这是因为<strong>噪声交易者</strong>（散户投资者）造成价格暂时偏离基本面。风险厌恶的做市商为吸收这些噪声需求而要求溢价，导致价格过度反应后回归。</p>
+      <p><strong>1. 短期反转 (表2: ρ₁ &lt; 0)：</strong>过去1个月的收益率与未来收益率呈负相关。这是因为<strong>噪声交易者</strong>造成价格暂时偏离基本面。</p>
       <span class="eq">r<sub>t</sub> = α + ρ₁·r<sub>t−1</sub> + ρ₂·r<sub>t−2</sub> + … + ρ₁₂·r<sub>t−12</sub> + ε<sub>t</sub> &nbsp;&nbsp;其中 ρ₁ &lt; 0</span>
-      <p><strong>2. 中长期动量 (表2: ρ₃…ρ₁₂ &gt; 0)：</strong>滞后3-12个月的收益率具有正向预测能力。这源于<strong>主动投资者对非自身产生的信息反应不足</strong>（一种过度自信，参见 Odean 1998）。价格逐步吸纳基本面信息，产生动量效应。</p>
-      <p><strong>3. 过渡区间 (表2: ρ₂ ≈ 0)：</strong>第2个月滞后的回归系数不显著——这是反转力量与动量力量大致抵消的死区。</p>
-      <p><strong>命题2（跳期效应）：</strong>在形成期和持有期之间跳过一个周期可增强动量：L* = L − Cov(P₂−P₀, P₃−P₂) &gt; L。这是因为跳期消除了噪声交易者引起的反转所造成的负协方差。</p>
-      <p><strong>BTC 应用：</strong>BTC 的高散户参与度和杠杆放大了噪声交易渠道，预示着<em>比传统股票更强的反转效应</em>。24/7 全天候市场和极端尾部事件需要调整参数（30天为一个月、对数收益率、更短的标准化窗口）。</p>
-    </div>
-  </div>
-
-  <div class="theory" id="theoryPredA">
-    <div class="theory-header" onclick="toggleTheory('theoryPredA')">
-      <h3>预测 (a)：信息冲击削弱反转</h3>
-      <span class="arrow">&#9660;</span>
-    </div>
-    <div class="theory-body">
-      <p><strong>论文（命题3）：</strong>在足够精确的公开信号（如财报公告）之后，短期反转效应会减弱。对信号的反应不足所产生的公告后漂移超过了噪声交易者引起的反转。</p>
-      <p><strong>BTC 适配：</strong>BTC 没有财报公告。我们用<strong>信息冲击</strong>替代：|对数收益率| &gt; 2.5× ATR% 且 成交量 &gt; 2× 平均成交量的事件。例如：ETF 获批、监管新闻、交易所崩溃。</p>
-      <p><strong>实现方式：</strong>在冲击发生后的10根K线内，反转分量 (Rev) 乘以 0.40 的衰减因子。含义是：<em>重大信息事件刚发生后，不要依赖"超卖反弹"逻辑——市场正在消化真实信息，而非仅仅是噪声。</em></p>
-      <p><strong>实证支持：</strong>论文表3显示，财报公告后1个月内反转效应减弱约68%（c = +0.025 vs ρ₁ = −0.037）。</p>
-    </div>
-  </div>
-
-  <div class="theory" id="theoryPredB">
-    <div class="theory-header" onclick="toggleTheory('theoryPredB')">
-      <h3>预测 (b)：反转与动量收益呈负相关</h3>
-      <span class="arrow">&#9660;</span>
-    </div>
-    <div class="theory-body">
-      <p><strong>论文：</strong>由于噪声交易的外生变化会同时增强反转、削弱动量，模型预测反转收益与动量收益之间存在<strong>反向关系</strong>——跨国家、跨时间均成立。</p>
-      <p><strong>实现方式：</strong>我们计算滚动 <code>corr(Rev, Mom)</code>，窗口为180根K线。正常情况下应为<strong>负值</strong>（健康的互补机制，以蓝色背景显示）。当相关性显著转正（&gt; 0.20）时，两种效应产生共振——这是异常现象，通常表示交易拥挤或机制转换。</p>
-      <p><strong>处理：</strong>当 corr &gt; 阈值时，综合评分自动乘以惩罚因子（0.60）。背景变为橙色作为警告。这是一个<em>风险开关</em>，而非择时信号。</p>
-    </div>
-  </div>
-
-  <div class="theory" id="theoryPredC">
-    <div class="theory-header" onclick="toggleTheory('theoryPredC')">
-      <h3>预测 (c)：噪声交易越多 → 反转越强</h3>
-      <span class="arrow">&#9660;</span>
-    </div>
-    <div class="theory-body">
-      <p><strong>论文（命题1）：</strong>随着噪声交易规模 (ν<sub>z</sub>) 增加，短期反转增强（S 变得更负），动量减弱（L 降低）。</p>
-      <p><strong>BTC 噪声代理：</strong>论文使用机构持股和散户订单失衡。对于 BTC，我们使用：ATR% 水平（权重40%）、成交量异常（权重30%）以及波动率机制——ATR 快/慢比率（权重30%）。这些被组合为 z 标准化的噪声代理。</p>
-      <p><strong>动态权重调整：</strong></p>
-      <span class="eq">wRev = max(0, 0.50 × (1 + 0.50 × noiseZ))<br>wMom = max(0, 0.50 × (1 − 0.50 × noiseZ × 0.5))<br>→ 归一化使 wRev + wMom = 1</span>
-      <p>噪声高时 → 反转权重增加，动量权重降低。BTC 的默认噪声敏感度（0.50）高于股票（0.40），因为其散户/杠杆参与度远高于传统市场。</p>
-      <p><strong>BTC 关键洞察：</strong>论文预测 BTC 应当表现出<em>比股票更强的反转效应</em>，这源于其噪声主导的市场结构。关注 AC(1)——如果持续为负，则该预测成立。</p>
+      <p><strong>2. 中长期动量 (表2: ρ₃…ρ₁₂ &gt; 0)：</strong>滞后3-12个月的收益率具有正向预测能力。源于<strong>主动投资者对信息反应不足</strong>。</p>
+      <p><strong>3. 过渡区间 (表2: ρ₂ ≈ 0)：</strong>第2个月滞后的回归系数不显著——反转和动量力量大致抵消的死区。</p>
     </div>
   </div>
 
@@ -533,12 +532,11 @@ footer a { color: var(--accent2); text-decoration: none; }
       <span class="arrow">&#9660;</span>
     </div>
     <div class="theory-body">
-      <p><strong>1. 横截面 vs. 时间序列：</strong>论文的收益来自<em>横截面十分位对冲组合</em>（做多赢家，做空输家）。本仪表盘是<em>单一资产的时间序列近似</em>——统计上并不等价。请作为方向性偏向/过滤器使用，而非独立的 alpha 来源。</p>
-      <p><strong>2. BTC 机制非平稳性：</strong>BTC 的市场结构已发生巨大变化——从纯散户（2017）到期货（2018），再到机构 + 现货 ETF（2024）。基于早期数据校准的参数可能不适用于2024年后。</p>
-      <p><strong>3. 样本量短：</strong>仅约7年可靠的 BTCUSDT 数据，不到4个完整周期。所有统计估计均有较宽的置信区间。</p>
-      <p><strong>4. 减半模块是叙事性的，非统计性的：</strong>仅有4次历史减半事件，且与宏观事件混淆。仅作为视觉参考。</p>
-      <p><strong>5. 缺少资金费率：</strong>最大的改进空间是将永续合约资金费率纳入噪声代理——它比 ATR/成交量更直接。标准 Binance K线数据中不包含此数据。</p>
-      <p><strong>6. 无风险管理：</strong>这是一个指标，不是策略。不包含止损、仓位管理或组合构建逻辑。</p>
+      <p><strong>1. 横截面 vs. 时间序列：</strong>论文研究的是横截面十分位对冲组合。本仪表盘是单一资产时间序列近似——统计上不等价。</p>
+      <p><strong>2. 过拟合风险：</strong>v2 参数通过回测优化，存在对训练期数据过拟合的可能。请关注样本外表现。</p>
+      <p><strong>3. 样本量短：</strong>仅约9年可靠数据，市场结构已多次变化（纯散户→期货→机构ETF）。</p>
+      <p><strong>4. 资金费率数据：</strong>仅从 2019-09 开始有数据。早期计算不含此因子。API 受限时使用缓存数据。</p>
+      <p><strong>5. 无风险管理：</strong>这是指标，不是交易系统。不包含止损、仓位管理或组合逻辑。</p>
     </div>
   </div>
 
@@ -554,20 +552,38 @@ footer a { color: var(--accent2); text-decoration: none; }
 
 <script>
 // ═══════════════════════════════════════════════════════════════
-// JLST BTC 仪表盘 — 主程序
+// JLST BTC v2 仪表盘 — 主程序
 // ═══════════════════════════════════════════════════════════════
 
 const DATA_BASE = 'data/';
 let currentTF = 'daily';
 let chartData = {};
-let priceChartObj = null;
-let compChartObj = null;
-let priceSeries = null;
-let priceVolSeries = null;
-let compSeries = null;
-let revSeries = null;
-let momSeries = null;
-let ac1Series = null;
+let priceChartObj = null, compChartObj = null, fundChartObj = null;
+let priceSeries = null, priceVolSeries = null;
+let compSeries = null, revSeries = null, momSeries = null, ac1Series = null;
+let fundSeries = null;
+
+// v1 defaults for parameter comparison
+const V1_PARAMS = {
+  revLen: 30, momLen: 330, momSkip: 30,
+  normLen: 180, entryThr: 1.0, noiseGain: 0.5,
+};
+const PARAM_LABELS = {
+  revLen: ['反转窗口', '天'],
+  momLen: ['动量窗口', '天'],
+  momSkip: ['动量跳过', '天'],
+  normLen: ['标准化窗口', '天'],
+  entryThr: ['入场阈值', ''],
+  noiseGain: ['噪声敏感度', ''],
+};
+const PARAM_NOTES = {
+  revLen: '短期反转回望天数',
+  momLen: '中长期动量回望天数',
+  momSkip: '跳过最近N天（消除反转干扰）',
+  normLen: 'z-score 标准化窗口',
+  entryThr: 'Composite 需超过此值才触发信号',
+  noiseGain: '噪声对权重调节的敏感度',
+};
 
 // ── Theme ──
 function getChartTheme() {
@@ -588,7 +604,6 @@ function toggleTheme() {
   render(currentTF);
 }
 
-// Restore saved theme
 (function() {
   const saved = localStorage.getItem('jlst-theme');
   if (saved) document.documentElement.dataset.theme = saved;
@@ -596,7 +611,7 @@ function toggleTheme() {
 
 // ── Data loading ──
 async function loadData(tf) {
-  const url = `${DATA_BASE}btc_${tf}.json`;
+  const url = `${DATA_BASE}btc_v2_${tf}.json`;
   try {
     const resp = await fetch(url);
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -607,22 +622,31 @@ async function loadData(tf) {
   }
 }
 
-// ── Time formatting ──
+// ── Formatting helpers ──
 function tsToDate(ms) {
   const d = new Date(ms);
   return { year: d.getUTCFullYear(), month: d.getUTCMonth() + 1, day: d.getUTCDate() };
 }
-function fmtDate(ms) {
-  const d = new Date(ms);
-  return d.toISOString().slice(0, 10);
-}
-function fmtNum(v, digits = 3) {
-  if (v == null) return '--';
-  return Number(v).toFixed(digits);
-}
+function fmtDate(ms) { return new Date(ms).toISOString().slice(0, 10); }
+function fmtNum(v, digits = 3) { return v == null ? '--' : Number(v).toFixed(digits); }
 function fmtPrice(v) {
   if (v == null) return '--';
   return '$' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function fmtPct(v) {
+  if (v == null) return '--';
+  return (v * 100).toFixed(4) + '%';
+}
+function fmtOHLC(v) {
+  if (v == null) return '--';
+  return Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function fmtVol(v) {
+  if (v == null) return '--';
+  if (v >= 1e9) return (v / 1e9).toFixed(2) + 'B';
+  if (v >= 1e6) return (v / 1e6).toFixed(2) + 'M';
+  if (v >= 1e3) return (v / 1e3).toFixed(1) + 'K';
+  return v.toFixed(0);
 }
 
 // ── Color helpers ──
@@ -634,92 +658,82 @@ function compColor(v) {
   if (v < 0) return 'rgba(248,81,73,0.6)';
   return 'var(--fg2)';
 }
-function valClass(v) {
-  if (v == null) return 'val-neutral';
-  return v > 0 ? 'val-pos' : v < 0 ? 'val-neg' : 'val-neutral';
-}
+function valClass(v) { return v == null ? 'val-neutral' : v > 0 ? 'val-pos' : v < 0 ? 'val-neg' : 'val-neutral'; }
 function statusLabel(s) {
-  const map = {
-    bullish: '看多',
-    bearish: '看空',
-    dead_zone: '死区 (ρ₂≈0)',
-    watch: '观望'
-  };
-  return map[s] || s;
+  return { bullish: '看多', bearish: '看空', dead_zone: '死区 (ρ₂≈0)', watch: '观望' }[s] || s;
 }
 function regimeLabel(s) {
-  const map = {
-    complementary: '互补（corr<0，正常）',
-    normal: '中性',
-    resonance: '⚠ 共振（corr>0，异常）'
-  };
-  return map[s] || s;
+  return { complementary: '互补（corr<0，正常）', normal: '中性', resonance: '⚠ 共振（corr>0，异常）' }[s] || s;
 }
 
-// ── Shared OHLC data lookup (built during createPriceChart) ──
-let ohlcByTime = {};   // key: "YYYY-MM-DD" → {o,h,l,c,vol,prevC}
-let compByTime = {};    // key: "YYYY-MM-DD" → {composite,rev,mom,ac1}
-let latestOHLC = null;
-let latestComp = null;
+// ── OHLC / composite / funding lookups ──
+let ohlcByTime = {}, compByTime = {}, fundByTime = {};
+let latestOHLC = null, latestComp = null, latestFund = null;
 
 function timeKey(t) {
-  // t = {year, month, day}
   return `${t.year}-${String(t.month).padStart(2,'0')}-${String(t.day).padStart(2,'0')}`;
-}
-
-function fmtOHLC(v) {
-  if (v == null) return '--';
-  return Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
-function fmtVol(v) {
-  if (v == null) return '--';
-  if (v >= 1e9) return (v / 1e9).toFixed(2) + 'B';
-  if (v >= 1e6) return (v / 1e6).toFixed(2) + 'M';
-  if (v >= 1e3) return (v / 1e3).toFixed(1) + 'K';
-  return v.toFixed(0);
 }
 
 function updatePriceLegend(o, h, l, c, vol, prevC) {
   const isUp = c >= o;
   const cls = isUp ? 'v-up' : 'v-dn';
-  document.getElementById('lg-o').className = cls;
-  document.getElementById('lg-o').textContent = fmtOHLC(o);
-  document.getElementById('lg-h').className = cls;
-  document.getElementById('lg-h').textContent = fmtOHLC(h);
-  document.getElementById('lg-l').className = cls;
-  document.getElementById('lg-l').textContent = fmtOHLC(l);
-  document.getElementById('lg-c').className = cls;
-  document.getElementById('lg-c').textContent = fmtOHLC(c);
-  document.getElementById('lg-vol').textContent = fmtVol(vol);
-  // Daily % change from previous close
+  ['lg-o','lg-h','lg-l','lg-c'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.className = cls; }
+  });
+  const setTxt = (id, txt) => { const e = document.getElementById(id); if (e) e.textContent = txt; };
+  setTxt('lg-o', fmtOHLC(o)); setTxt('lg-h', fmtOHLC(h));
+  setTxt('lg-l', fmtOHLC(l)); setTxt('lg-c', fmtOHLC(c));
+  setTxt('lg-vol', fmtVol(vol));
   const pctEl = document.getElementById('lg-pct');
-  if (prevC != null && prevC !== 0) {
-    const pct = ((c - prevC) / prevC * 100);
-    pctEl.textContent = (pct >= 0 ? '+' : '') + pct.toFixed(2) + '%';
-    pctEl.className = pct >= 0 ? 'pct-up' : 'pct-dn';
-  } else {
-    pctEl.textContent = '--';
-    pctEl.className = '';
+  if (pctEl) {
+    if (prevC != null && prevC !== 0) {
+      const pct = ((c - prevC) / prevC * 100);
+      pctEl.textContent = (pct >= 0 ? '+' : '') + pct.toFixed(2) + '%';
+      pctEl.className = pct >= 0 ? 'pct-up' : 'pct-dn';
+    } else { pctEl.textContent = '--'; pctEl.className = ''; }
   }
 }
 
 function updateCompLegend(comp, rev, mom, ac1) {
   const compEl = document.getElementById('lg-comp');
-  compEl.textContent = fmtNum(comp);
-  compEl.className = comp >= 0 ? 'v-comp-pos' : 'v-comp-neg';
-  document.getElementById('lg-rev').textContent = fmtNum(rev);
-  document.getElementById('lg-mom').textContent = fmtNum(mom);
-  document.getElementById('lg-ac1').textContent = fmtNum(ac1);
+  if (compEl) { compEl.textContent = fmtNum(comp); compEl.className = comp >= 0 ? 'v-comp-pos' : 'v-comp-neg'; }
+  const setTxt = (id, txt) => { const e = document.getElementById(id); if (e) e.textContent = txt; };
+  setTxt('lg-rev', fmtNum(rev)); setTxt('lg-mom', fmtNum(mom)); setTxt('lg-ac1', fmtNum(ac1));
 }
 
-// ── Chart creation ──
+function updateFundLegend(fr) {
+  const el = document.getElementById('lg-fund');
+  if (el) {
+    if (fr != null) {
+      el.textContent = fmtPct(fr);
+      el.className = fr >= 0 ? 'v-fund-pos' : 'v-fund-neg';
+    } else {
+      el.textContent = 'N/A';
+      el.className = '';
+    }
+  }
+}
+
+// ── Chart: Price ──
 function createPriceChart(container, data) {
-  // Build legend HTML (re-inserted after chart creation)
   const tfLabels = { daily: '日线', weekly: '周线', monthly: '月线' };
-  const legendHTML = `<div class="chart-legend" id="priceLegend">
+  container.innerHTML = '';
+  const ct = getChartTheme();
+  const chart = LightweightCharts.createChart(container, {
+    width: container.clientWidth,
+    height: container.clientHeight || 280,
+    layout: { background: { color: ct.bg }, textColor: ct.text, fontSize: 11 },
+    grid: { vertLines: { color: ct.grid }, horzLines: { color: ct.grid } },
+    crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+    timeScale: { timeVisible: false, borderVisible: false, borderColor: ct.border },
+    rightPriceScale: { borderColor: ct.border },
+  });
+  priceChartObj = chart;
+
+  container.insertAdjacentHTML('beforeend', `<div class="chart-legend" id="priceLegend">
     <div class="legend-title">BTC/USDT · <span id="legendTF">${tfLabels[currentTF] || currentTF}</span></div>
-    <div class="legend-row" id="ohlcRow">
+    <div class="legend-row">
       <span><span class="lbl">O </span><span id="lg-o">--</span></span>
       <span><span class="lbl">H </span><span id="lg-h">--</span></span>
       <span><span class="lbl">L </span><span id="lg-l">--</span></span>
@@ -729,28 +743,8 @@ function createPriceChart(container, data) {
     <div class="legend-row">
       <span><span class="lbl">Vol </span><span id="lg-vol" style="color:var(--fg2)">--</span></span>
     </div>
-  </div>`;
-  container.innerHTML = '';
+  </div>`);
 
-  const ct = getChartTheme();
-  const chartH = container.clientHeight || 320;
-  const chart = LightweightCharts.createChart(container, {
-    width: container.clientWidth,
-    height: chartH,
-    layout: { background: { color: ct.bg }, textColor: ct.text, fontSize: 11 },
-    grid: { vertLines: { color: ct.grid }, horzLines: { color: ct.grid } },
-    crosshair: {
-      mode: LightweightCharts.CrosshairMode.Normal,
-      vertLine: { labelVisible: true },
-      horzLine: { labelVisible: true },
-    },
-    timeScale: { timeVisible: false, borderVisible: false, borderColor: ct.border },
-    rightPriceScale: { borderColor: ct.border },
-  });
-  priceChartObj = chart;
-  container.insertAdjacentHTML('beforeend', legendHTML);
-
-  // Candlestick series
   priceSeries = chart.addCandlestickSeries({
     upColor: '#26a69a', downColor: '#ef5350',
     borderUpColor: '#26a69a', borderDownColor: '#ef5350',
@@ -769,137 +763,94 @@ function createPriceChart(container, data) {
     const l = hasOHLC ? (d.low[i] ?? d.close[i]) : d.close[i];
     const c = d.close[i];
     candleData.push({ time: t, open: o, high: h, low: l, close: c });
-    const prevC = i > 0 ? d.close[i - 1] : null;
-    ohlcByTime[timeKey(t)] = { o, h, l, c, vol: d.volume[i], prevC };
+    ohlcByTime[timeKey(t)] = { o, h, l, c, vol: d.volume[i], prevC: i > 0 ? d.close[i-1] : null };
   }
   priceSeries.setData(candleData);
 
-  // Store latest for default legend state
   if (candleData.length > 0) {
     const last = candleData[candleData.length - 1];
-    const k = timeKey(last.time);
-    latestOHLC = ohlcByTime[k];
+    latestOHLC = ohlcByTime[timeKey(last.time)];
     updatePriceLegend(latestOHLC.o, latestOHLC.h, latestOHLC.l, latestOHLC.c, latestOHLC.vol, latestOHLC.prevC);
   }
 
-  // Volume histogram
-  priceVolSeries = chart.addHistogramSeries({
-    priceFormat: { type: 'volume' },
-    priceScaleId: 'vol',
-  });
-  chart.priceScale('vol').applyOptions({
-    scaleMargins: { top: 0.8, bottom: 0 },
-  });
-
+  // Volume
+  priceVolSeries = chart.addHistogramSeries({ priceFormat: { type: 'volume' }, priceScaleId: 'vol' });
+  chart.priceScale('vol').applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
   const volData = [];
   for (let i = 0; i < d.timestamps.length; i++) {
     if (d.volume[i] == null) continue;
     const isUp = i > 0 && d.close[i] >= d.close[i - 1];
-    volData.push({
-      time: tsToDate(d.timestamps[i]),
-      value: d.volume[i],
-      color: isUp ? 'rgba(63,185,80,0.2)' : 'rgba(248,81,73,0.2)',
-    });
+    volData.push({ time: tsToDate(d.timestamps[i]), value: d.volume[i], color: isUp ? 'rgba(63,185,80,0.2)' : 'rgba(248,81,73,0.2)' });
   }
   priceVolSeries.setData(volData);
 
   // Signal markers
   const markers = [];
   for (let i = 0; i < d.timestamps.length; i++) {
-    if (d.long_sig[i]) {
-      markers.push({
-        time: tsToDate(d.timestamps[i]),
-        position: 'belowBar', color: '#3fb950', shape: 'arrowUp', text: '多',
-      });
-    }
-    if (d.short_sig[i]) {
-      markers.push({
-        time: tsToDate(d.timestamps[i]),
-        position: 'aboveBar', color: '#f85149', shape: 'arrowDown', text: '空',
-      });
-    }
-    if (d.cascade[i]) {
-      markers.push({
-        time: tsToDate(d.timestamps[i]),
-        position: 'aboveBar', color: '#bc8cff', shape: 'circle', text: '⚡',
-      });
-    }
+    if (d.long_sig[i]) markers.push({ time: tsToDate(d.timestamps[i]), position: 'belowBar', color: '#3fb950', shape: 'arrowUp', text: '多' });
+    if (d.short_sig[i]) markers.push({ time: tsToDate(d.timestamps[i]), position: 'aboveBar', color: '#f85149', shape: 'arrowDown', text: '空' });
+    if (d.cascade[i]) markers.push({ time: tsToDate(d.timestamps[i]), position: 'aboveBar', color: '#bc8cff', shape: 'circle', text: '⚡' });
   }
   priceSeries.setMarkers(markers);
 
-  // Crosshair move → update OHLC legend + sync composite chart
+  // Crosshair sync → comp + fund
   chart.subscribeCrosshairMove(param => {
     if (param.time) {
       const k = timeKey(param.time);
       const bar = ohlcByTime[k];
       if (bar) updatePriceLegend(bar.o, bar.h, bar.l, bar.c, bar.vol, bar.prevC);
-      // Sync crosshair to composite chart
       if (compChartObj && compSeries) {
-        const compBar = compByTime[k];
-        if (compBar != null) {
-          compChartObj.setCrosshairPosition(compBar.composite, param.time, compSeries);
-          updateCompLegend(compBar.composite, compBar.rev, compBar.mom, compBar.ac1);
-        }
+        const cb = compByTime[k];
+        if (cb) { compChartObj.setCrosshairPosition(cb.composite, param.time, compSeries); updateCompLegend(cb.composite, cb.rev, cb.mom, cb.ac1); }
+      }
+      if (fundChartObj && fundSeries) {
+        const fb = fundByTime[k];
+        if (fb != null) { fundChartObj.setCrosshairPosition(fb.fr ?? 0, param.time, fundSeries); updateFundLegend(fb.fr); }
       }
     } else {
-      // Mouse left → show latest
       if (latestOHLC) updatePriceLegend(latestOHLC.o, latestOHLC.h, latestOHLC.l, latestOHLC.c, latestOHLC.vol, latestOHLC.prevC);
       if (compChartObj) compChartObj.clearCrosshairPosition();
+      if (fundChartObj) fundChartObj.clearCrosshairPosition();
       if (latestComp) updateCompLegend(latestComp.composite, latestComp.rev, latestComp.mom, latestComp.ac1);
+      if (latestFund != null) updateFundLegend(latestFund);
     }
   });
 
   chart.timeScale().fitContent();
-  new ResizeObserver(() => {
-    chart.applyOptions({ width: container.clientWidth, height: container.clientHeight || 320 });
-  }).observe(container);
+  new ResizeObserver(() => { chart.applyOptions({ width: container.clientWidth, height: container.clientHeight || 280 }); }).observe(container);
 }
 
+// ── Chart: Composite ──
 function createCompChart(container, data) {
-  const compLegendHTML = `<div class="chart-legend" id="compLegend">
-    <div class="legend-title">JLST 综合评分</div>
-    <div class="legend-row" id="compLegendRow">
+  container.innerHTML = '';
+  const ct = getChartTheme();
+  const chart = LightweightCharts.createChart(container, {
+    width: container.clientWidth,
+    height: container.clientHeight || 220,
+    layout: { background: { color: ct.bg }, textColor: ct.text, fontSize: 11 },
+    grid: { vertLines: { color: ct.grid }, horzLines: { color: ct.grid } },
+    crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+    timeScale: { timeVisible: false, borderVisible: false, borderColor: ct.border },
+    rightPriceScale: { borderColor: ct.border },
+  });
+  compChartObj = chart;
+
+  container.insertAdjacentHTML('beforeend', `<div class="chart-legend" id="compLegend">
+    <div class="legend-title">JLST v2 综合评分</div>
+    <div class="legend-row">
       <span><span class="lbl">综合 </span><span id="lg-comp">--</span></span>
       <span><span class="lbl">反转 </span><span id="lg-rev" class="v-rev">--</span></span>
       <span><span class="lbl">动量 </span><span id="lg-mom" class="v-mom">--</span></span>
       <span><span class="lbl">AC(1) </span><span id="lg-ac1" class="v-ac1">--</span></span>
     </div>
-  </div>`;
-  container.innerHTML = '';
-
-  const ct = getChartTheme();
-  const compH = container.clientHeight || 280;
-  const chart = LightweightCharts.createChart(container, {
-    width: container.clientWidth,
-    height: compH,
-    layout: { background: { color: ct.bg }, textColor: ct.text, fontSize: 11 },
-    grid: { vertLines: { color: ct.grid }, horzLines: { color: ct.grid } },
-    crosshair: {
-      mode: LightweightCharts.CrosshairMode.Normal,
-      vertLine: { labelVisible: true },
-      horzLine: { labelVisible: true },
-    },
-    timeScale: { timeVisible: false, borderVisible: false, borderColor: ct.border },
-    rightPriceScale: { borderColor: ct.border },
-  });
-  compChartObj = chart;
-  container.insertAdjacentHTML('beforeend', compLegendHTML);
+  </div>`);
 
   const d = data.data;
-
-  // Build compByTime lookup
   compByTime = {};
   for (let i = 0; i < d.timestamps.length; i++) {
     const t = tsToDate(d.timestamps[i]);
-    compByTime[timeKey(t)] = {
-      composite: d.composite[i],
-      rev: d.rev[i],
-      mom: d.mom[i],
-      ac1: d.ac1[i],
-    };
+    compByTime[timeKey(t)] = { composite: d.composite[i], rev: d.rev[i], mom: d.mom[i], ac1: d.ac1[i] };
   }
-
-  // Store latest for default legend
   if (d.timestamps.length > 0) {
     const lastT = tsToDate(d.timestamps[d.timestamps.length - 1]);
     latestComp = compByTime[timeKey(lastT)];
@@ -907,13 +858,10 @@ function createCompChart(container, data) {
   }
 
   // Composite histogram
-  compSeries = chart.addHistogramSeries({
-    priceFormat: { type: 'price', precision: 3, minMove: 0.001 },
-  });
+  compSeries = chart.addHistogramSeries({ priceFormat: { type: 'price', precision: 3, minMove: 0.001 } });
   const compData = [];
   for (let i = 0; i < d.timestamps.length; i++) {
-    const v = d.composite[i];
-    if (v == null) continue;
+    const v = d.composite[i]; if (v == null) continue;
     let color;
     if (v >= 1.0) color = 'rgba(63,185,80,0.9)';
     else if (v > 0) color = 'rgba(63,185,80,0.4)';
@@ -923,151 +871,188 @@ function createCompChart(container, data) {
   }
   compSeries.setData(compData);
 
-  // Rev line
-  revSeries = chart.addLineSeries({
-    color: '#d29922', lineWidth: 1,
-    priceScaleId: 'right',
-    lastValueVisible: false, priceLineVisible: false,
-  });
-  const revData = [];
-  for (let i = 0; i < d.timestamps.length; i++) {
-    if (d.rev[i] == null) continue;
-    revData.push({ time: tsToDate(d.timestamps[i]), value: d.rev[i] });
-  }
-  revSeries.setData(revData);
+  // Rev, Mom, AC(1) lines
+  revSeries = chart.addLineSeries({ color: '#d29922', lineWidth: 1, priceScaleId: 'right', lastValueVisible: false, priceLineVisible: false });
+  momSeries = chart.addLineSeries({ color: '#58a6ff', lineWidth: 1, priceScaleId: 'right', lastValueVisible: false, priceLineVisible: false });
+  ac1Series = chart.addLineSeries({ color: '#bc8cff', lineWidth: 1, lineStyle: 2, priceScaleId: 'right', lastValueVisible: false, priceLineVisible: false });
 
-  // Mom line
-  momSeries = chart.addLineSeries({
-    color: '#58a6ff', lineWidth: 1,
-    priceScaleId: 'right',
-    lastValueVisible: false, priceLineVisible: false,
-  });
-  const momData = [];
-  for (let i = 0; i < d.timestamps.length; i++) {
-    if (d.mom[i] == null) continue;
-    momData.push({ time: tsToDate(d.timestamps[i]), value: d.mom[i] });
-  }
-  momSeries.setData(momData);
+  const buildLine = (arr) => {
+    const out = [];
+    for (let i = 0; i < d.timestamps.length; i++) {
+      if (arr[i] == null) continue;
+      out.push({ time: tsToDate(d.timestamps[i]), value: arr[i] });
+    }
+    return out;
+  };
+  revSeries.setData(buildLine(d.rev));
+  momSeries.setData(buildLine(d.mom));
+  ac1Series.setData(buildLine(d.ac1));
 
-  // AC(1) line
-  ac1Series = chart.addLineSeries({
-    color: '#bc8cff', lineWidth: 1, lineStyle: 2,
-    priceScaleId: 'right',
-    lastValueVisible: false, priceLineVisible: false,
-  });
-  const ac1Data = [];
-  for (let i = 0; i < d.timestamps.length; i++) {
-    if (d.ac1[i] == null) continue;
-    ac1Data.push({ time: tsToDate(d.timestamps[i]), value: d.ac1[i] });
-  }
-  ac1Series.setData(ac1Data);
-
-  // Crosshair move → update comp legend + sync price chart
+  // Crosshair sync → price + fund
   chart.subscribeCrosshairMove(param => {
     if (param.time) {
       const k = timeKey(param.time);
       const bar = compByTime[k];
       if (bar) updateCompLegend(bar.composite, bar.rev, bar.mom, bar.ac1);
-      // Sync crosshair to price chart
       if (priceChartObj && priceSeries) {
-        const ohlc = ohlcByTime[k];
-        if (ohlc) {
-          priceChartObj.setCrosshairPosition(ohlc.c, param.time, priceSeries);
-          updatePriceLegend(ohlc.o, ohlc.h, ohlc.l, ohlc.c, ohlc.vol, ohlc.prevC);
-        }
+        const ob = ohlcByTime[k];
+        if (ob) { priceChartObj.setCrosshairPosition(ob.c, param.time, priceSeries); updatePriceLegend(ob.o, ob.h, ob.l, ob.c, ob.vol, ob.prevC); }
+      }
+      if (fundChartObj && fundSeries) {
+        const fb = fundByTime[k];
+        if (fb != null) { fundChartObj.setCrosshairPosition(fb.fr ?? 0, param.time, fundSeries); updateFundLegend(fb.fr); }
       }
     } else {
-      // Mouse left → show latest
       if (latestComp) updateCompLegend(latestComp.composite, latestComp.rev, latestComp.mom, latestComp.ac1);
       if (priceChartObj) priceChartObj.clearCrosshairPosition();
+      if (fundChartObj) fundChartObj.clearCrosshairPosition();
       if (latestOHLC) updatePriceLegend(latestOHLC.o, latestOHLC.h, latestOHLC.l, latestOHLC.c, latestOHLC.vol, latestOHLC.prevC);
+      if (latestFund != null) updateFundLegend(latestFund);
     }
   });
 
   chart.timeScale().fitContent();
-  new ResizeObserver(() => {
-    chart.applyOptions({ width: container.clientWidth, height: container.clientHeight || 280 });
-  }).observe(container);
+  new ResizeObserver(() => { chart.applyOptions({ width: container.clientWidth, height: container.clientHeight || 220 }); }).observe(container);
 }
 
-// ── Time scale sync (drag/scroll one chart → other follows) ──
+// ── Chart: Funding Rate ──
+function createFundChart(container, data) {
+  container.innerHTML = '';
+  const ct = getChartTheme();
+  const chart = LightweightCharts.createChart(container, {
+    width: container.clientWidth,
+    height: container.clientHeight || 120,
+    layout: { background: { color: ct.bg }, textColor: ct.text, fontSize: 11 },
+    grid: { vertLines: { color: ct.grid }, horzLines: { color: ct.grid } },
+    crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+    timeScale: { timeVisible: false, borderVisible: false, borderColor: ct.border },
+    rightPriceScale: { borderColor: ct.border },
+  });
+  fundChartObj = chart;
+
+  container.insertAdjacentHTML('beforeend', `<div class="chart-legend" id="fundLegend">
+    <div class="legend-title">Funding Rate · 日均</div>
+    <div class="legend-row">
+      <span><span class="lbl">FR </span><span id="lg-fund">--</span></span>
+    </div>
+  </div>`);
+
+  const d = data.data;
+  const fr = d.funding_rate || [];
+  fundByTime = {};
+  fundSeries = chart.addHistogramSeries({
+    priceFormat: { type: 'price', precision: 6, minMove: 0.000001 },
+  });
+
+  const fundData = [];
+  let lastValid = null;
+  for (let i = 0; i < d.timestamps.length; i++) {
+    const t = tsToDate(d.timestamps[i]);
+    const v = fr[i];
+    fundByTime[timeKey(t)] = { fr: v };
+    if (v == null) continue;
+    lastValid = v;
+    fundData.push({
+      time: t,
+      value: v,
+      color: v >= 0 ? 'rgba(248,81,73,0.7)' : 'rgba(63,185,80,0.7)',
+    });
+  }
+  fundSeries.setData(fundData);
+  latestFund = lastValid;
+
+  // Display latest
+  const latEl = document.getElementById('fundLatest');
+  if (latEl) latEl.textContent = lastValid != null ? `FR: ${fmtPct(lastValid)}` : 'FR: N/A（数据获取中）';
+
+  // Crosshair sync → price + comp
+  chart.subscribeCrosshairMove(param => {
+    if (param.time) {
+      const k = timeKey(param.time);
+      const fb = fundByTime[k];
+      if (fb != null) updateFundLegend(fb.fr);
+      if (priceChartObj && priceSeries) {
+        const ob = ohlcByTime[k];
+        if (ob) { priceChartObj.setCrosshairPosition(ob.c, param.time, priceSeries); updatePriceLegend(ob.o, ob.h, ob.l, ob.c, ob.vol, ob.prevC); }
+      }
+      if (compChartObj && compSeries) {
+        const cb = compByTime[k];
+        if (cb) { compChartObj.setCrosshairPosition(cb.composite, param.time, compSeries); updateCompLegend(cb.composite, cb.rev, cb.mom, cb.ac1); }
+      }
+    } else {
+      if (latestFund != null) updateFundLegend(latestFund);
+      if (priceChartObj) priceChartObj.clearCrosshairPosition();
+      if (compChartObj) compChartObj.clearCrosshairPosition();
+      if (latestOHLC) updatePriceLegend(latestOHLC.o, latestOHLC.h, latestOHLC.l, latestOHLC.c, latestOHLC.vol, latestOHLC.prevC);
+      if (latestComp) updateCompLegend(latestComp.composite, latestComp.rev, latestComp.mom, latestComp.ac1);
+    }
+  });
+
+  chart.timeScale().fitContent();
+  new ResizeObserver(() => { chart.applyOptions({ width: container.clientWidth, height: container.clientHeight || 120 }); }).observe(container);
+}
+
+// ── Time scale sync (3-way) ──
 let isSyncing = false;
 function syncTimeScales() {
-  if (!priceChartObj || !compChartObj) return;
-  priceChartObj.timeScale().subscribeVisibleLogicalRangeChange(range => {
-    if (isSyncing || !range) return;
-    isSyncing = true;
-    compChartObj.timeScale().setVisibleLogicalRange(range);
-    isSyncing = false;
-  });
-  compChartObj.timeScale().subscribeVisibleLogicalRangeChange(range => {
-    if (isSyncing || !range) return;
-    isSyncing = true;
-    priceChartObj.timeScale().setVisibleLogicalRange(range);
-    isSyncing = false;
+  const charts = [priceChartObj, compChartObj, fundChartObj].filter(Boolean);
+  charts.forEach((src, si) => {
+    src.timeScale().subscribeVisibleLogicalRangeChange(range => {
+      if (isSyncing || !range) return;
+      isSyncing = true;
+      charts.forEach((tgt, ti) => { if (ti !== si) tgt.timeScale().setVisibleLogicalRange(range); });
+      isSyncing = false;
+    });
   });
 }
 
-// ── Indicator toggle (show/hide series on composite chart) ──
+// ── Indicator toggle ──
 const indVisible = { composite: true, rev: true, mom: true, ac1: true };
 function toggleIndicator(key) {
   indVisible[key] = !indVisible[key];
   const seriesMap = { composite: compSeries, rev: revSeries, mom: momSeries, ac1: ac1Series };
   const s = seriesMap[key];
   if (s) {
-    // Lightweight Charts v4: set line/histogram to transparent to "hide"
     if (key === 'composite') {
-      if (indVisible[key]) {
-        // Re-set data to restore colors
-        const d = chartData[currentTF].data;
-        const compData = [];
-        for (let i = 0; i < d.timestamps.length; i++) {
-          const v = d.composite[i]; if (v == null) continue;
-          let color;
+      const d = chartData[currentTF].data;
+      const cd = [];
+      for (let i = 0; i < d.timestamps.length; i++) {
+        const v = d.composite[i]; if (v == null) continue;
+        let color;
+        if (indVisible[key]) {
           if (v >= 1.0) color = 'rgba(63,185,80,0.9)';
           else if (v > 0) color = 'rgba(63,185,80,0.4)';
           else if (v <= -1.0) color = 'rgba(248,81,73,0.9)';
           else color = 'rgba(248,81,73,0.4)';
-          compData.push({ time: tsToDate(d.timestamps[i]), value: v, color });
-        }
-        s.setData(compData);
-      } else {
-        const d = chartData[currentTF].data;
-        const compData = [];
-        for (let i = 0; i < d.timestamps.length; i++) {
-          const v = d.composite[i]; if (v == null) continue;
-          compData.push({ time: tsToDate(d.timestamps[i]), value: v, color: 'transparent' });
-        }
-        s.setData(compData);
+        } else { color = 'transparent'; }
+        cd.push({ time: tsToDate(d.timestamps[i]), value: v, color });
       }
+      s.setData(cd);
     } else {
       const colors = { rev: '#d29922', mom: '#58a6ff', ac1: '#bc8cff' };
       s.applyOptions({ color: indVisible[key] ? colors[key] : 'transparent' });
     }
   }
-  // Toggle button appearance
-  const btn = document.querySelector(`.ind-btn[data-key="${key}"]`);
-  if (btn) btn.classList.toggle('off', !indVisible[key]);
+  document.querySelectorAll(`.ind-btn[data-key="${key}"]`).forEach(btn => {
+    btn.classList.toggle('off', !indVisible[key]);
+  });
 }
 
 function applyIndicatorState() {
-  // Apply current indVisible state to series and all buttons
   const seriesMap = { composite: compSeries, rev: revSeries, mom: momSeries, ac1: ac1Series };
   const colors = { rev: '#d29922', mom: '#58a6ff', ac1: '#bc8cff' };
   Object.keys(indVisible).forEach(k => {
     const s = seriesMap[k];
     if (!s) return;
-    if (k === 'composite') {
-      if (!indVisible[k]) {
-        const d = chartData[currentTF].data;
-        const cd = [];
-        for (let i = 0; i < d.timestamps.length; i++) {
-          const v = d.composite[i]; if (v == null) continue;
-          cd.push({ time: tsToDate(d.timestamps[i]), value: v, color: 'transparent' });
-        }
-        s.setData(cd);
+    if (k === 'composite' && !indVisible[k]) {
+      const d = chartData[currentTF].data;
+      const cd = [];
+      for (let i = 0; i < d.timestamps.length; i++) {
+        const v = d.composite[i]; if (v == null) continue;
+        cd.push({ time: tsToDate(d.timestamps[i]), value: v, color: 'transparent' });
       }
-    } else {
+      s.setData(cd);
+    } else if (k !== 'composite') {
       s.applyOptions({ color: indVisible[k] ? colors[k] : 'transparent' });
     }
     document.querySelectorAll(`.ind-btn[data-key="${k}"]`).forEach(btn => {
@@ -1076,10 +1061,12 @@ function applyIndicatorState() {
   });
 }
 
-// ── Fullscreen ──
+// ── Fullscreen (3-chart with dual splitters) ──
 let isFullscreen = false;
 let fsOverlay = null;
-let fsSplitRatio = 0.6; // price chart gets 60% by default
+// Ratios: price gets 55%, comp gets 30%, funding gets 15% of total
+let fsSplitR1 = 0.55;  // top splitter: price / (comp+fund)
+let fsSplitR2 = 0.67;  // bottom splitter: comp / fund within the remaining space
 
 function toggleFullscreen() {
   if (isFullscreen) { exitFullscreen(); return; }
@@ -1089,7 +1076,7 @@ function toggleFullscreen() {
   fsOverlay.className = 'charts-fullscreen';
   fsOverlay.innerHTML = `
     <div class="fs-toolbar">
-      <span class="fs-title">JLST BTC 反转-动量</span>
+      <span class="fs-title">JLST BTC v2 反转-动量</span>
       <div style="display:flex;align-items:center;gap:8px">
         <div class="ind-toggles" id="fsIndToggles"></div>
         <button class="fs-exit-btn" onclick="toggleFullscreen()">✕ 退出全屏</button>
@@ -1097,12 +1084,14 @@ function toggleFullscreen() {
     </div>
     <div class="fs-body" id="fsBody">
       <div class="fs-price" id="fsPriceChart"></div>
-      <div class="fs-splitter" id="fsSplitter"></div>
+      <div class="fs-splitter" id="fsSplitter1"></div>
       <div class="fs-comp" id="fsCompChart"></div>
+      <div class="fs-splitter" id="fsSplitter2"></div>
+      <div class="fs-fund" id="fsFundChart"></div>
     </div>`;
   document.body.appendChild(fsOverlay);
 
-  // Clone indicator toggle buttons
+  // Clone indicator toggles
   const fsToggles = fsOverlay.querySelector('#fsIndToggles');
   document.querySelectorAll('#indToggles .ind-btn').forEach(btn => {
     const clone = btn.cloneNode(true);
@@ -1115,49 +1104,50 @@ function toggleFullscreen() {
     fsToggles.appendChild(clone);
   });
 
-  // Apply split ratio and render charts
   applyFsSplit();
 
   const data = chartData[currentTF];
   if (data) {
     createPriceChart(document.getElementById('fsPriceChart'), data);
     createCompChart(document.getElementById('fsCompChart'), data);
+    createFundChart(document.getElementById('fsFundChart'), data);
     syncTimeScales();
     applyIndicatorState();
   }
 
-  // Splitter drag logic
-  initSplitter();
-
+  initSplitter('fsSplitter1', 1);
+  initSplitter('fsSplitter2', 2);
   document.addEventListener('keydown', fsEscHandler);
 }
 
 function applyFsSplit() {
   const body = document.getElementById('fsBody');
   if (!body) return;
-  const price = document.getElementById('fsPriceChart');
-  const comp = document.getElementById('fsCompChart');
-  const splitter = document.getElementById('fsSplitter');
-  const totalH = body.clientHeight - (splitter ? splitter.offsetHeight : 6);
-  const pH = Math.round(totalH * fsSplitRatio);
-  const cH = totalH - pH;
-  price.style.height = pH + 'px';
-  comp.style.height = cH + 'px';
+  const sp1 = document.getElementById('fsSplitter1');
+  const sp2 = document.getElementById('fsSplitter2');
+  const splitterH = (sp1 ? sp1.offsetHeight : 6) + (sp2 ? sp2.offsetHeight : 6);
+  const totalH = body.clientHeight - splitterH;
+  const priceH = Math.round(totalH * fsSplitR1);
+  const restH = totalH - priceH;
+  const compH = Math.round(restH * fsSplitR2);
+  const fundH = restH - compH;
+  const setH = (id, h) => { const e = document.getElementById(id); if (e) e.style.height = h + 'px'; };
+  setH('fsPriceChart', priceH);
+  setH('fsCompChart', compH);
+  setH('fsFundChart', fundH);
 }
 
-function initSplitter() {
-  const splitter = document.getElementById('fsSplitter');
+function initSplitter(splitterId, which) {
+  const splitter = document.getElementById(splitterId);
   const body = document.getElementById('fsBody');
   if (!splitter || !body) return;
 
-  let dragging = false;
-  let startY = 0;
-  let startRatio = 0;
+  let dragging = false, startY = 0, startR = 0;
 
   function onDown(e) {
     dragging = true;
     startY = e.clientY || e.touches?.[0]?.clientY || 0;
-    startRatio = fsSplitRatio;
+    startR = which === 1 ? fsSplitR1 : fsSplitR2;
     splitter.classList.add('active');
     document.body.style.cursor = 'row-resize';
     document.body.style.userSelect = 'none';
@@ -1167,9 +1157,17 @@ function initSplitter() {
     if (!dragging) return;
     const clientY = e.clientY || e.touches?.[0]?.clientY || 0;
     const dy = clientY - startY;
-    const totalH = body.clientHeight - splitter.offsetHeight;
-    const newRatio = Math.min(0.85, Math.max(0.15, startRatio + dy / totalH));
-    fsSplitRatio = newRatio;
+    const sp1 = document.getElementById('fsSplitter1');
+    const sp2 = document.getElementById('fsSplitter2');
+    const splitterH = (sp1 ? sp1.offsetHeight : 6) + (sp2 ? sp2.offsetHeight : 6);
+    const totalH = body.clientHeight - splitterH;
+
+    if (which === 1) {
+      fsSplitR1 = Math.min(0.80, Math.max(0.15, startR + dy / totalH));
+    } else {
+      const restH = totalH * (1 - fsSplitR1);
+      if (restH > 0) fsSplitR2 = Math.min(0.85, Math.max(0.15, startR + dy / restH));
+    }
     applyFsSplit();
   }
   function onUp() {
@@ -1187,7 +1185,6 @@ function initSplitter() {
   document.addEventListener('mouseup', onUp);
   document.addEventListener('touchend', onUp);
 
-  // Store cleanup refs
   splitter._cleanup = () => {
     document.removeEventListener('mousemove', onMove);
     document.removeEventListener('touchmove', onMove);
@@ -1199,8 +1196,10 @@ function initSplitter() {
 function exitFullscreen() {
   isFullscreen = false;
   if (fsOverlay) {
-    const sp = fsOverlay.querySelector('#fsSplitter');
-    if (sp?._cleanup) sp._cleanup();
+    ['fsSplitter1', 'fsSplitter2'].forEach(id => {
+      const sp = fsOverlay.querySelector('#' + id);
+      if (sp?._cleanup) sp._cleanup();
+    });
     fsOverlay.remove();
     fsOverlay = null;
   }
@@ -1209,6 +1208,7 @@ function exitFullscreen() {
   if (data) {
     createPriceChart(document.getElementById('priceChart'), data);
     createCompChart(document.getElementById('compChart'), data);
+    createFundChart(document.getElementById('fundChart'), data);
     syncTimeScales();
     applyIndicatorState();
   }
@@ -1220,25 +1220,22 @@ function updateDashboard(data) {
   const s = data.summary;
   const p = data.params;
 
-  // Price badge
   document.getElementById('priceVal').textContent = fmtPrice(s.price);
   const pill = document.getElementById('statusPill');
   pill.textContent = statusLabel(s.signal_state);
   pill.className = 'status-pill status-' + s.signal_state;
 
-  // Core metrics
   setMetric('m-comp', fmtNum(s.composite), valClass(s.composite));
   setMetric('m-rev', fmtNum(s.rev), valClass(s.rev));
   setMetric('m-mom', fmtNum(s.mom), valClass(s.mom));
   setMetric('m-ac1', fmtNum(s.ac1), s.ac1 < 0 ? 'val-pos' : 'val-neg');
+  setMetric('m-funding', s.funding_rate != null ? fmtPct(s.funding_rate) : 'N/A', s.funding_rate != null ? (s.funding_rate > 0.001 ? 'val-warn' : 'val-neutral') : 'val-neutral');
 
-  // Weights
   setMetric('m-wrev', fmtNum(s.w_rev), 'val-info');
   setMetric('m-wmom', fmtNum(s.w_mom), 'val-info');
   setMetric('m-noisez', fmtNum(s.noise_z), s.noise_z > 1 ? 'val-warn' : 'val-neutral');
   setMetric('m-volreg', fmtNum(s.vol_regime, 2), s.vol_regime > 1.15 ? 'val-warn' : 'val-neutral');
 
-  // Regime
   setMetric('m-corr', fmtNum(s.corr_rm, 2), s.corr_rm > 0.2 ? 'val-warn' : 'val-neutral');
   const regEl = document.getElementById('m-regime');
   regEl.textContent = regimeLabel(s.regime);
@@ -1251,26 +1248,19 @@ function updateDashboard(data) {
 
   setMetric('m-shock', s.post_shock ? '是（Rev 已衰减）' : '否', s.post_shock ? 'val-warn' : 'val-neutral');
 
-  // BTC-specific
   setMetric('m-halv', s.days_since_halv != null ? s.days_since_halv + ' 天' : '--', 'val-neutral');
   setMetric('m-halvactive', s.post_halv ? '是（Mom 已增强）' : '否', s.post_halv ? 'val-warn' : 'val-neutral');
   setMetric('m-cascade', s.cascade ? '⚡ 激活' : '无', s.cascade ? 'val-warn' : 'val-neutral');
   setMetric('m-update', s.last_update ? s.last_update.slice(0, 10) : '--', 'val-neutral');
 
-  // Regime bar
-  const bar = document.getElementById('regimeBar');
-  bar.className = 'regime-bar regime-' + s.regime;
+  document.getElementById('regimeBar').className = 'regime-bar regime-' + s.regime;
 
-  // Composite latest
   const compEl = document.getElementById('compLatest');
   compEl.textContent = `综合评分: ${fmtNum(s.composite)}`;
   compEl.style.color = compColor(s.composite);
 
-  // Params display
-  const paramsEl = document.getElementById('paramsDisplay');
-  paramsEl.innerHTML = Object.entries(p).map(([k, v]) =>
-    `<span style="background:var(--bg3);padding:2px 8px;border-radius:4px;border:1px solid var(--border)">${k}=${v}</span>`
-  ).join('');
+  // Parameter comparison table
+  updateParamCompare(p);
 }
 
 function setMetric(id, text, cls) {
@@ -1280,13 +1270,36 @@ function setMetric(id, text, cls) {
   el.className = 'metric-val ' + (cls || '');
 }
 
+function updateParamCompare(v2p) {
+  const body = document.getElementById('paramCompareBody');
+  if (!body) return;
+  const keys = ['revLen', 'momLen', 'momSkip', 'normLen', 'entryThr', 'noiseGain'];
+  body.innerHTML = keys.map(k => {
+    const v1 = V1_PARAMS[k];
+    const v2 = v2p[k] ?? v1;
+    const changed = v1 !== v2;
+    const [label, unit] = PARAM_LABELS[k] || [k, ''];
+    const note = PARAM_NOTES[k] || '';
+    return `<tr>
+      <td>${label}</td>
+      <td>${v1}${unit ? ' ' + unit : ''}</td>
+      <td class="${changed ? 'changed' : ''}">${v2}${unit ? ' ' + unit : ''}${changed ? ' ←' : ''}</td>
+      <td style="color:var(--fg2);font-family:var(--font)">${note}</td>
+    </tr>`;
+  }).join('') + `<tr>
+    <td>噪声代理</td>
+    <td style="font-family:var(--font)">ATR+量+机制</td>
+    <td class="changed" style="font-family:var(--font)">+ 资金费率 ←</td>
+    <td style="color:var(--fg2);font-family:var(--font)">v2 新增 30% 权重的 Funding Rate</td>
+  </tr>`;
+}
+
 // ── Signal history table ──
 function updateSignalTable(data) {
   const signals = data.signals_history || [];
-  const body = document.getElementById('sigBody');
   document.getElementById('sigCount').textContent = `${signals.length} 个事件`;
-
-  const rows = signals.slice().reverse().map(s => {
+  const body = document.getElementById('sigBody');
+  body.innerHTML = signals.slice().reverse().map(s => {
     const cls = s.type === 'long' ? 'sig-long' : s.type === 'short' ? 'sig-short' : 'sig-cascade';
     const label = s.type === 'long' ? '▲ 做多' : s.type === 'short' ? '▼ 做空' : '⚡ 级联';
     return `<tr>
@@ -1297,17 +1310,14 @@ function updateSignalTable(data) {
       <td style="color:#d29922">${fmtNum(s.rev)}</td>
       <td style="color:#58a6ff">${fmtNum(s.mom)}</td>
     </tr>`;
-  });
-  body.innerHTML = rows.join('');
+  }).join('');
 }
 
 // ── Theory toggles ──
 function toggleTheory(id) {
   const el = document.getElementById(id);
-  const header = el.querySelector('.theory-header');
-  const body = el.querySelector('.theory-body');
-  header.classList.toggle('open');
-  body.classList.toggle('open');
+  el.querySelector('.theory-header').classList.toggle('open');
+  el.querySelector('.theory-body').classList.toggle('open');
 }
 
 // ── Tab switching ──
@@ -1317,19 +1327,14 @@ function setupTabs() {
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
       tab.classList.add('active');
       const tf = tab.dataset.tf;
-      if (tf !== currentTF) {
-        currentTF = tf;
-        render(tf);
-      }
+      if (tf !== currentTF) { currentTF = tf; render(tf); }
     });
   });
 }
 
 // ── Main render ──
 async function render(tf) {
-  if (!chartData[tf]) {
-    chartData[tf] = await loadData(tf);
-  }
+  if (!chartData[tf]) chartData[tf] = await loadData(tf);
   const data = chartData[tf];
   if (!data) {
     document.getElementById('priceChart').innerHTML = '<div class="loading"><div>加载数据失败。请先运行 <code>python scripts/update_data.py</code>。</div></div>';
@@ -1338,11 +1343,11 @@ async function render(tf) {
 
   createPriceChart(document.getElementById('priceChart'), data);
   createCompChart(document.getElementById('compChart'), data);
+  createFundChart(document.getElementById('fundChart'), data);
   syncTimeScales();
   updateDashboard(data);
   updateSignalTable(data);
 
-  // Price range
   const d = data.data;
   if (d.timestamps.length > 0) {
     document.getElementById('priceRange').textContent =
@@ -1354,8 +1359,9 @@ async function render(tf) {
 // ── Init ──
 (async function init() {
   setupTabs();
-  document.getElementById('priceChart').innerHTML = '<div class="loading"><div class="spinner"></div><div>加载数据中...</div></div>';
+  document.getElementById('priceChart').innerHTML = '<div class="loading"><div class="spinner"></div><div>加载 v2 数据中...</div></div>';
   document.getElementById('compChart').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  document.getElementById('fundChart').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
   await render('daily');
 })();
 </script>

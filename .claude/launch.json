@@ -4,7 +4,7 @@
     {
       "name": "jlst-site",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["serve", "."],
+      "runtimeArgs": ["serve", "btc-jlst-momentum"],
       "port": 3000
     }
   ]
