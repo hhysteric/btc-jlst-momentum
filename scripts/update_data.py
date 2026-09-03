@@ -849,7 +849,8 @@ def compute_jlst(data: dict, params: dict) -> dict:
             "signal_state": _slice_str(signal_state, start),
         },
         "signals_history": _build_signal_history(
-            timestamps, close, comp, rev_eff, mom_eff, long_sig, short_sig, cascade, signal_state, start
+            timestamps, close, comp, rev_eff, mom_eff, long_sig, short_sig, cascade, signal_state, start,
+            opn=data["open"]
         ),
     }
 
@@ -863,21 +864,50 @@ def _r(v, digits=4):
     return round(v, digits)
 
 
-def _build_signal_history(ts, close, comp, rev, mom, long_sig, short_sig, cascade, state, start):
-    """Extract a list of notable signal events for the history table."""
+def _build_signal_history(ts, close, comp, rev, mom, long_sig, short_sig, cascade, state, start, opn=None):
+    """Extract a list of notable signal events for the history table.
+
+    When *opn* (open prices) is provided, each event includes forward
+    returns: enter at next-day open, exit at close after 1/3/5/7/30 days.
+    """
+    FWD_PERIODS = [1, 3, 5, 7, 30]
     events = []
     n = len(ts)
     for i in range(max(start, 1), n):
         if long_sig[i] or short_sig[i] or cascade[i]:
             dt = datetime.fromtimestamp(ts[i] / 1000, tz=timezone.utc)
-            events.append({
+            sig_type = "long" if long_sig[i] else ("short" if short_sig[i] else "cascade")
+            ev = {
                 "date": dt.strftime("%Y-%m-%d"),
-                "type": "long" if long_sig[i] else ("short" if short_sig[i] else "cascade"),
+                "type": sig_type,
                 "price": _r(close[i], 2),
                 "composite": _r(comp[i]),
                 "rev": _r(rev[i]),
                 "mom": _r(mom[i]),
-            })
+            }
+
+            # Forward returns: enter at open[i+1], exit at close[i+1+N]
+            if opn is not None and i + 1 < n:
+                entry_price = opn[i + 1]
+                if entry_price and entry_price > 0:
+                    is_short = (sig_type == "short")
+                    for p in FWD_PERIODS:
+                        exit_idx = i + 1 + p
+                        if exit_idx < n and close[exit_idx] is not None and close[exit_idx] > 0:
+                            ret = (close[exit_idx] - entry_price) / entry_price
+                            if is_short:
+                                ret = -ret
+                            ev[f"fwd_{p}d"] = _r(ret * 100, 2)  # percentage
+                        else:
+                            ev[f"fwd_{p}d"] = None
+                else:
+                    for p in FWD_PERIODS:
+                        ev[f"fwd_{p}d"] = None
+            else:
+                for p in FWD_PERIODS:
+                    ev[f"fwd_{p}d"] = None
+
+            events.append(ev)
     return events[-200:]  # keep last 200 events
 
 
@@ -1209,7 +1239,8 @@ def compute_jlst_v2(data: dict, params: dict, funding_aligned: list) -> dict:
             "funding_rate": [_r(v, 6) for v in funding_aligned[start:]],
         },
         "signals_history": _build_signal_history(
-            timestamps, close, comp, rev_eff, mom_eff, long_sig, short_sig, cascade, signal_state, start
+            timestamps, close, comp, rev_eff, mom_eff, long_sig, short_sig, cascade, signal_state, start,
+            opn=opn
         ),
     }
 

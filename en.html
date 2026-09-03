@@ -463,7 +463,7 @@ footer a { color: var(--accent2); text-decoration: none; }
     <div class="table-scroll">
       <table>
         <thead>
-          <tr><th>Date</th><th>Type</th><th>Price</th><th>Composite</th><th>Rev</th><th>Mom</th></tr>
+          <tr><th>Date</th><th>Type</th><th>Price</th><th>Composite</th><th>Rev</th><th>Mom</th><th>1D</th><th>3D</th><th>5D</th><th>7D</th><th>30D</th></tr>
         </thead>
         <tbody id="sigBody"></tbody>
       </table>
@@ -1268,6 +1268,13 @@ function setMetric(id, text, cls) {
 }
 
 // ── Signal history table ──
+function fmtFwd(v) {
+  if (v == null) return '<td style="color:var(--fg2)">--</td>';
+  const color = v >= 0 ? '#3fb950' : '#f85149';
+  const sign = v >= 0 ? '+' : '';
+  return `<td style="color:${color};font-weight:600">${sign}${v.toFixed(2)}%</td>`;
+}
+
 function updateSignalTable(data) {
   const signals = data.signals_history || [];
   const body = document.getElementById('sigBody');
@@ -1283,9 +1290,31 @@ function updateSignalTable(data) {
       <td style="color:${compColor(s.composite)}">${fmtNum(s.composite)}</td>
       <td style="color:#d29922">${fmtNum(s.rev)}</td>
       <td style="color:#58a6ff">${fmtNum(s.mom)}</td>
+      ${fmtFwd(s.fwd_1d)}${fmtFwd(s.fwd_3d)}${fmtFwd(s.fwd_5d)}${fmtFwd(s.fwd_7d)}${fmtFwd(s.fwd_30d)}
     </tr>`;
   });
-  body.innerHTML = rows.join('');
+
+  // Summary row
+  const periods = ['fwd_1d','fwd_3d','fwd_5d','fwd_7d','fwd_30d'];
+  const summaryTds = periods.map(key => {
+    const vals = signals.filter(s => s[key] != null).map(s => s[key]);
+    if (vals.length === 0) return '<td style="color:var(--fg2)">--</td>';
+    const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
+    const wins = vals.filter(v => v > 0).length;
+    const wr = (wins / vals.length * 100).toFixed(0);
+    const color = avg >= 0 ? '#3fb950' : '#f85149';
+    return `<td style="color:${color};font-size:11px;line-height:1.3">
+      <div style="font-weight:700">${avg >= 0 ? '+' : ''}${avg.toFixed(2)}%</div>
+      <div style="color:var(--fg2)">WR ${wr}% (${vals.length})</div>
+    </td>`;
+  }).join('');
+
+  const summaryRow = `<tr style="border-top:2px solid var(--border);background:var(--bg2)">
+    <td colspan="6" style="font-weight:700;text-align:right;color:var(--fg2)">📊 Avg Return / Win Rate</td>
+    ${summaryTds}
+  </tr>`;
+
+  body.innerHTML = summaryRow + rows.join('');
 }
 
 // ── Theory toggles ──
