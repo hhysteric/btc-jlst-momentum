@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JLST BTC 反转-动量模型 · 新手入门</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@4.6.1/dist/reveal.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@4.6.1/dist/theme/black.min.css">
+<style>
+  :root {
+    --green: #3fb950;
+    --red: #f85149;
+    --blue: #58a6ff;
+    --orange: #d29922;
+    --bg: #0d1117;
+    --fg: #e6edf3;
+    --fg2: #8b949e;
+    --accent: #58a6ff;
+  }
+  .reveal { font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif; color: var(--fg); }
+  .reveal .slides { text-align: left; }
+  .reveal h1, .reveal h2, .reveal h3 { color: var(--fg); font-weight: 700; text-align: left; }
+  .reveal h1 { font-size: 2.2em; }
+  .reveal h2 { font-size: 1.6em; border-bottom: 3px solid var(--accent); padding-bottom: 8px; margin-bottom: 24px; }
+  .reveal h3 { font-size: 1.2em; color: var(--fg2); }
+  .reveal p, .reveal li { font-size: 0.75em; line-height: 1.7; color: var(--fg); }
+  .reveal ul { margin-left: 0; padding-left: 1.2em; }
+  .reveal li { margin-bottom: 0.4em; }
+  .reveal .slides section { padding: 40px 60px; }
+  .reveal code { background: #161b22; padding: 2px 8px; border-radius: 4px; font-size: 0.85em; color: var(--orange); }
+  .reveal .small { font-size: 0.6em; color: var(--fg2); }
+  .reveal .tag { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 0.65em; font-weight: 600; margin: 2px; }
+  .tag-green { background: rgba(63,185,80,0.15); color: var(--green); border: 1px solid rgba(63,185,80,0.3); }
+  .tag-red { background: rgba(248,81,73,0.15); color: var(--red); border: 1px solid rgba(248,81,73,0.3); }
+  .tag-blue { background: rgba(88,166,255,0.15); color: var(--blue); border: 1px solid rgba(88,166,255,0.3); }
+  .tag-orange { background: rgba(210,153,34,0.15); color: var(--orange); border: 1px solid rgba(210,153,34,0.3); }
+
+  /* Cover slide */
+  .cover h1 { font-size: 2.6em; text-align: center; margin-bottom: 0; }
+  .cover .subtitle { text-align: center; font-size: 1em; color: var(--fg2); margin-top: 8px; }
+  .cover .meta { text-align: center; font-size: 0.7em; color: var(--fg2); margin-top: 32px; }
+
+  /* Highlight box */
+  .highlight-box { background: #161b22; border-left: 4px solid var(--accent); padding: 16px 20px; border-radius: 8px; margin: 16px 0; }
+  .highlight-box.green { border-left-color: var(--green); }
+  .highlight-box.red { border-left-color: var(--red); }
+  .highlight-box.orange { border-left-color: var(--orange); }
+
+  /* Formula */
+  .formula { background: #161b22; padding: 20px 24px; border-radius: 10px; text-align: center; font-size: 1.1em; margin: 20px 0; font-family: 'Cambria Math', Georgia, serif; color: var(--blue); letter-spacing: 0.5px; }
+
+  /* Data table */
+  .data-table { width: 100%; border-collapse: collapse; font-size: 0.65em; margin: 12px 0; }
+  .data-table th { background: #161b22; color: var(--fg2); padding: 10px 12px; text-align: center; font-weight: 600; border-bottom: 2px solid #30363d; }
+  .data-table td { padding: 8px 12px; text-align: center; border-bottom: 1px solid #21262d; }
+  .data-table tr:hover { background: rgba(88,166,255,0.05); }
+
+  /* Two column */
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; align-items: start; }
+  .two-col > div { min-width: 0; }
+
+  /* Metric card */
+  .metric-row { display: flex; gap: 16px; flex-wrap: wrap; margin: 16px 0; }
+  .metric { background: #161b22; border-radius: 10px; padding: 16px 20px; flex: 1; min-width: 140px; text-align: center; }
+  .metric .num { font-size: 1.8em; font-weight: 800; margin: 4px 0; }
+  .metric .label { font-size: 0.65em; color: var(--fg2); }
+
+  /* Emoji bullet */
+  .emoji-list { list-style: none; padding-left: 0; }
+  .emoji-list li { padding-left: 0; margin-bottom: 0.6em; }
+  .emoji-list li::before { content: none; }
+
+  /* VS comparison */
+  .vs-card { display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; align-items: center; margin: 16px 0; }
+  .vs-card .vs { font-size: 1.4em; color: var(--fg2); font-weight: 800; text-align: center; }
+
+  /* Progress bar */
+  .bar-wrap { margin: 6px 0; }
+  .bar-label { display: flex; justify-content: space-between; font-size: 0.6em; margin-bottom: 4px; }
+  .bar { height: 8px; border-radius: 4px; background: #21262d; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 4px; transition: width 0.8s ease; }
+
+  /* Section divider */
+  .section-divider { text-align: center; }
+  .section-divider h2 { text-align: center; border: none; font-size: 2em; }
+  .section-divider .num { font-size: 4em; font-weight: 900; color: var(--accent); opacity: 0.3; line-height: 1; }
+
+  /* Footer */
+  .slide-footer { position: absolute; bottom: 16px; left: 60px; right: 60px; font-size: 0.5em; color: var(--fg2); display: flex; justify-content: space-between; }
+</style>
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+
+<!-- ============================================ -->
+<!-- SLIDE 1: Cover -->
+<!-- ============================================ -->
+<section>
+  <div class="cover">
+    <div style="margin-bottom:40px">
+      <span class="tag tag-blue">📊 量化指标</span>
+      <span class="tag tag-green">🔬 学术论文驱动</span>
+      <span class="tag tag-orange">₿ BTC 适配</span>
+    </div>
+    <h1>JLST BTC<br>反转-动量模型</h1>
+    <div class="subtitle">新手入门指南</div>
+    <div class="meta">
+      基于 Jegadeesh, Luo, Subrahmanyam & Titman (2025)<br>
+      <em>Review of Financial Studies</em> — 全球顶级金融学术期刊<br><br>
+      <span style="color:var(--fg2)">仪表盘地址：<a href="https://hhysteric.github.io/btc-jlst-momentum/" style="color:var(--accent)" target="_blank">hhysteric.github.io/btc-jlst-momentum</a></span>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================ -->
+<!-- SLIDE 2: The Problem -->
+<!-- ============================================ -->
+<section>
+  <h2>💭 你可能遇到过这些问题</h2>
+  <ul class="emoji-list" style="font-size:0.85em">
+    <li class="fragment">📉 BTC 跌了 10%，朋友说"抄底"，你不确定——<strong style="color:var(--green)">还会反弹吗？</strong></li>
+    <li class="fragment">📈 BTC 涨了一个月，你想追——<strong style="color:var(--red)">趋势还能持续吗？</strong></li>
+    <li class="fragment">😵 看了一堆指标（RSI、MACD、布林带），信号互相矛盾</li>
+    <li class="fragment">🤔 想要一个<strong style="color:var(--accent)">有学术论文支撑</strong>的、而不是靠"画线"的分析工具</li>
+  </ul>
+  <div class="fragment highlight-box" style="margin-top:24px">
+    <strong>JLST 模型的价值：</strong>用一个统一的理论框架，同时回答"该不该抄底"和"趋势能不能追"这两个问题。
+  </div>
+</section>
+
+<!-- ============================================ -->
+<!-- SLIDE 3: Paper Origin -->
+<!-- ============================================ -->
+<section>
+  <h2>📚 论文出处</h2>
+  <div class="highlight-box" style="font-size:0.8em">
+    <strong>N. Jegadeesh, J. Luo, A. Subrahmanyam, S. Titman</strong> (2025)<br>
+    <em>"Short-Term Reversals and Longer-Term Momentum around the World"</em><br>
+    <strong>Review of Financial Studies (RFS)</strong> — 金融学三大顶刊之一
+  </div>
+  <div class="two-col fragment" style="margin-top:24px">
+    <div>
+      <h3>论文做了什么？</h3>
+      <ul>
+        <li>研究了 <strong>39 个国家</strong>股票市场</li>
+        <li>用同一个模型解释"短期反转"和"中长期动量"如何<strong>同时存在</strong></li>
+        <li>发现<strong>噪声交易</strong>是两者联系的关键纽带</li>
+      </ul>
+    </div>
+    <div>
+      <h3>我们做了什么？</h3>
+      <ul>
+        <li>将论文的理论应用到 <strong>BTC 市场</strong></li>
+        <li>构建了一个实时仪表盘</li>
+        <li>v2 版本通过<strong>回测优化</strong>和<strong>资金费率</strong>进行了 BTC 适配</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================ -->
+<!-- SECTION: Core Concepts -->
+<!-- ============================================ -->
+<section class="section-divider">
+  <div class="num">01</div>
+  <h2>核心概念</h2>
+  <h3 style="text-align:center">短期反转 & 中长期动量</h3>
+</section>
+
+<!-- ============================================ -->
+<!-- SLIDE 4: Reversal -->
+<!-- ============================================ -->
+<section>
+  <h2>🔄 什么是短期反转？</h2>
+  <div class="two-col">
+    <div>
+      <div class="highlight-box red">
+        <strong>一句话：</strong>过去 1 个月跌多了的资产，未来容易<span style="color:var(--green)">反弹</span>
+      </div>
+      <ul class="fragment">
+        <li><strong>原因：噪声交易者</strong>（散户、杠杆投机者）让价格暂时偏离基本面</li>
+        <li>做市商承接这些"噪声订单"需要补偿 → 价格<strong>过度反应</strong></li>
+        <li>过度反应之后 → 价格<strong>回归均值</strong></li>
+      </ul>
+      <div class="fragment small" style="margin-top:12px">
+        论文证据：表2 显示 ρ₁ < 0（过去1个月收益与未来收益负相关）
+      </div>
+    </div>
+    <div class="fragment">
+      <div style="background:#161b22;border-radius:10px;padding:20px;text-align:center">
+        <div style="font-size:3em;margin-bottom:8px">📉 → 📈</div>
+        <div style="font-size:0.7em;color:var(--fg2)">短期跌多了 → 反弹</div>
+        <div style="margin-top:16px;font-size:0.65em;color:var(--orange)">
+          BTC 散户参与度高 + 杠杆放大<br>→ 反转效应比股票<strong>更强</strong>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================ -->
+<!-- SLIDE 5: Momentum -->
+<!-- ============================================ -->
+<section>
+  <h2>🚀 什么是中长期动量？</h2>
+  <div class="two-col">
+    <div>
+      <div class="highlight-box green">
+        <strong>一句话：</strong>过去 3-12 个月涨的资产，未来可能<span style="color:var(--green)">继续涨</span>
+      </div>
+      <ul class="fragment">
+        <li><strong>原因：信息反应不足</strong> — 投资者对非自己产生的信息不够重视</li>
+        <li>新信息（如 ETF 获批、减半周期）→ 价格<strong>逐步消化</strong>，而不是一步到位</li>
+        <li>这个"消化过程"就形成了<strong>趋势延续</strong></li>
+      </ul>
+      <div class="fragment small" style="margin-top:12px">
+        论文证据：表2 显示 ρ₃…ρ₁₂ > 0（滞后3-12月收益与未来收益正相关）
+      </div>
+    </div>
+    <div class="fragment">
+      <div style="background:#161b22;border-radius:10px;padding:20px;text-align:center">
+        <div style="font-size:3em;margin-bottom:8px">📈 → 📈📈</div>
+        <div style="font-size:0.7em;color:var(--fg2)">中长期涨 → 继续涨</div>
+        <div style="margin-top:16px;font-size:0.65em;color:var(--blue)">
+          关键技巧："跳过"最近 1 个月<br>
+          消除反转干扰 → 动量更纯粹
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================ -->
+<!-- SLIDE 6: Coexistence -->
+<!-- ============================================ -->
+<section>
+  <h2>🤝 反转 vs 动量 — 如何共存？</h2>
+  <p style="color:var(--fg2);font-size:0.75em">看似矛盾：一个说"跌了要涨"，一个说"涨了还涨"？</p>
+
+  <div class="two-col fragment" style="margin-top:16px">
+    <div class="highlight-box red" style="text-align:center">
+      <div style="font-size:1.5em;margin-bottom:4px">🔄 短期反转</div>
+      <div style="font-size:0.7em">时间窗口：<strong>1 个月</strong></div>
+      <div style="font-size:0.7em">驱动因子：<strong>噪声交易</strong>（散户投机）</div>
+      <div style="font-size:0.7em">逻辑：价格偏离 → 回归</div>
+    </div>
+    <div class="highlight-box green" style="text-align:center">
+      <div style="font-size:1.5em;margin-bottom:4px">🚀 中长期动量</div>
+      <div style="font-size:0.7em">时间窗口：<strong>3-12 个月</strong></div>
+      <div style="font-size:0.7em">驱动因子：<strong>信息反应不足</strong></div>
+      <div style="font-size:0.7em">逻辑：信息消化 → 趋势延续</div>
+    </div>
+  </div>
+
+  <div class="fragment highlight-box" style="margin-top:20px">
+    <strong>💡 JLST 的核心洞察：</strong>两者不矛盾！它们的<strong>驱动因子不同</strong>、<strong>时间尺度不同</strong>。
+    噪声交易越多 → 反转越强 + 动量越弱。这个跷跷板关系在 39 个国家都成立。
+  </div>
+</section>
+
+<!-- ============================================ -->
+<!-- SLIDE 7: Noise Traders -->
+<!-- ============================================ -->
+<section>
+  <h2>📢 噪声交易者 = 关键变量</h2>
+  <div class="highlight-box orange">
+    <strong>论文核心发现（命题1）：</strong>噪声交易规模 ↑ → 反转增强 & 动量减弱
+  </div>
+
+  <div class="two-col fragment" style="margin-top:20px">
+    <div>
+      <h3>什么是噪声交易者？</h3>
+      <ul>
+        <li>不基于基本面分析、而是跟风/情绪驱动的交易者</li>
+        <li>散户 FOMO 追涨、恐慌杀跌</li>
+        <li>高杠杆投机者</li>
+        <li>他们让市场<strong>短期过度反应</strong></li>
+      </ul>
+    </div>
+    <div>
+      <h3>BTC vs 股票</h3>
+      <table class="data-table">
+        <tr><th></th><th>股票</th><th>BTC</th></tr>
+        <tr><td>散户占比</td><td>约 20%</td><td style="color:var(--orange)"><strong>&gt;60%</strong></td></tr>
+        <tr><td>最大杠杆</td><td>2-4x</td><td style="color:var(--orange)"><strong>125x</strong></td></tr>
+        <tr><td>交易时间</td><td>6.5h/天</td><td style="color:var(--orange)"><strong>24/7</strong></td></tr>
+        <tr><td>预期反转强度</td><td>一般</td><td style="color:var(--green)"><strong>更强</strong></td></tr>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================ -->
+<!-- SLIDE 8: Formula -->
+<!-- ============================================ -->
+<section>
+  <h2>📐 公式一图流</h2>
+
+  <div class="formula fragment">
+    Composite = w<sub>Rev</sub> × Rev<sub>z</sub> + w<sub>Mom</sub> × Mom<sub>z</sub>
+  </div>
+
+  <div class="two-col fragment">
+    <div>
+      <ul style="font-size:0.7em">
+        <li><strong style="color:var(--orange)">Rev<sub>z</sub></strong> = 短期反转因子（z-score 标准化）<br><span class="small">过去 30 天的对数收益率</span></li>
+        <li><strong style="color:var(--blue)">Mom<sub>z</sub></strong> = 中长期动量因子（z-score 标准化）<br><span class="small">过去 270 天收益，跳过最近 21 天</span></li>
+        <li><strong>w<sub>Rev</sub>, w<sub>Mom</sub></strong> = 动态权重<br><span class="small">由噪声代理自动调节，和为 1</span></li>
+      </ul>
+    </div>
+    <div>
+      <div style="background:#161b22;border-radius:10px;padding:16px;font-size:0.7em">
+        <div style="margin-bottom:12px"><strong>动态权重调节：</strong></div>
+        <div>🔊 噪声高时（市场投机热）</div>
+        <div style="margin-left:16px;color:var(--orange)">→ w<sub>Rev</sub> ↑  &nbsp;w<sub>Mom</sub> ↓</div>
+        <div style="margin-top:8px">🔇 噪声低时（市场理性）</div>
+        <div style="margin-left:16px;color:var(--blue)">→ w<sub>Rev</sub> ↓  &nbsp;w<sub>Mom</sub> ↑</div>
+        <div style="margin-top:12px;color:var(--fg2);font-size:0.85em">
+          综合评分 &gt; 0 → 看多<br>
+          综合评分 &lt; 0 → 看空
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================ -->
+<!-- SECTION: Indicator System -->
+<!-- ============================================ -->
+<section class="section-divider">
+  <div class="num">02</div>
+  <h2>指标体系</h2>
+  <h3 style="text-align:center">v1 论文版 & v2 BTC 适配版</h3>
+</section>
+
+<!-- ============================================ -->
+<!-- SLIDE 9: Signal Rules -->
+<!-- ============================================ -->
+<section>
+  <h2>🎯 信号触发规则</h2>
+
+  <div class="two-col">
+    <div>
+      <div class="highlight-box green" style="text-align:center;font-size:0.85em">
+        <div style="font-size:1.5em;margin-bottom:4px">▲ 做多信号</div>
+        综合评分 <strong>&gt; +阈值</strong>
+      </div>
+      <div class="highlight-box red" style="text-align:center;font-size:0.85em">
+        <div style="font-size:1.5em;margin-bottom:4px">▼ 做空信号</div>
+        综合评分 <strong>&lt; −阈值</strong>
+      </div>
+      <div class="highlight-box" style="text-align:center;font-size:0.85em">
+        <div style="font-size:1.5em;margin-bottom:4px">⚡ 级联预警</div>
+        反转和动量同方向极端（罕见但强力）
+      </div>
+    </div>
+    <div class="fragment">
+      <h3>智能过滤机制</h3>
+      <ul style="font-size:0.7em">
+        <li><strong>死区过滤</strong>（±0.25）<br><span class="small">评分在 −0.25 到 +0.25 之间时不发信号，避免噪声</span></li>
+        <li><strong>信息冲击衰减</strong><br><span class="small">BTC 突然暴涨/暴跌后 10 天内，反转权重打 0.4 折</span></li>
+        <li><strong>反转-动量相关性惩罚</strong><br><span class="small">当 corr(Rev, Mom) > 0.20 时，评分打 0.6 折（机制异常）</span></li>
+        <li><strong>减半周期增强</strong><br><span class="small">减半后 540 天内动量信号增强 1.2 倍</span></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================ -->
+<!-- SLIDE 10: v1 vs v2 -->
+<!-- ============================================ -->
+<section>
+  <h2>⚡ v1 vs v2 参数对比</h2>
+
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th style="text-align:left">参数</th>
+        <th>v1（论文原版）</th>
+        <th>v2（BTC 适配）</th>
+        <th style="text-align:left">含义</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td style="text-align:left">反转窗口</td>
+        <td>30 天</td>
+        <td>30 天</td>
+        <td style="text-align:left;color:var(--fg2)">短期回望天数</td>
+      </tr>
+      <tr>
+        <td style="text-align:left">动量窗口</td>
+        <td>330 天</td>
+        <td style="color:var(--orange)"><strong>270 天 ←</strong></td>
+        <td style="text-align:left;color:var(--fg2)">中长期回望天数</td>
+      </tr>
+      <tr>
+        <td style="text-align:left">动量跳过</td>
+        <td>30 天</td>
+        <td style="color:var(--orange)"><strong>21 天 ←</strong></td>
+        <td style="text-align:left;color:var(--fg2)">消除反转干扰</td>
+      </tr>
+      <tr>
+        <td style="text-align:left">入场阈值</td>
+        <td>±1.00</td>
+        <td style="color:var(--orange)"><strong>±0.50 ←</strong></td>
+        <td style="text-align:left;color:var(--fg2)">发出信号的门槛</td>
+      </tr>
+      <tr>
+        <td style="text-align:left">噪声敏感度</td>
+        <td>0.50</td>
+        <td style="color:var(--orange)"><strong>0.30 ←</strong></td>
+        <td style="text-align:left;color:var(--fg2)">权重调节力度</td>
+      </tr>
+      <tr>
+        <td style="text-align:left">噪声代理</td>
+        <td>ATR + 量 + 机制</td>
+        <td style="color:var(--green)"><strong>+ 资金费率 ←</strong></td>
+        <td style="text-align:left;color:var(--fg2)">衡量投机程度</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="fragment highlight-box orange" style="margin-top:16px;font-size:0.7em">
+    <strong>v2 的改进：</strong>① 入场阈值降低 → 捕获更多有效信号&emsp;② 动量窗口缩短 → 适应 BTC 更快的信息传播&emsp;③ 加入资金费率 → 更直接衡量杠杆投机热度
+  </div>
+  <p class="small fragment">v2 参数通过 2017-2023 年 BTC 日线数据网格搜索优化，2024-2026 年数据样本外验证</p>
+</section>
+
+<!-- ============================================ -->
+<!-- SLIDE 11: Funding Rate -->
+<!-- ============================================ -->
+<section>
+  <h2>💰 为什么资金费率很重要？</h2>
+
+  <div class="two-col">
+    <div>
+      <div class="highlight-box">
+        <strong>什么是资金费率 (Funding Rate)？</strong><br>
+        <span style="font-size:0.85em">永续合约多空双方之间每 8 小时支付一次的费用</span>
+      </div>
+      <ul class="fragment" style="font-size:0.7em;margin-top:16px">
+        <li><strong style="color:var(--red)">FR &gt; 0（正）：</strong>多头付费给空头<br>→ 市场做多过度，<strong>杠杆/投机热度高</strong></li>
+        <li><strong style="color:var(--green)">FR &lt; 0（负）：</strong>空头付费给多头<br>→ 市场做空过度</li>
+        <li>FR 绝对值越大 → <strong>噪声交易越活跃</strong></li>
+      </ul>
+    </div>
+    <div class="fragment">
+      <div style="background:#161b22;border-radius:10px;padding:16px;font-size:0.7em">
+        <div style="margin-bottom:12px"><strong>v2 噪声代理公式：</strong></div>
+        <div class="formula" style="font-size:0.85em;padding:12px;margin:8px 0">
+          noise_z = 0.25×ATR + 0.25×量比<br>+ 0.20×机制 + <strong style="color:var(--green)">0.30×|FR|_z</strong>
+        </div>
+        <div style="margin-top:12px;color:var(--fg2)">
+          论文用"机构持仓比"衡量噪声<br>
+          BTC 没有这个数据<br>
+          <strong style="color:var(--green)">→ 资金费率是最好的替代品</strong><br>
+          <span style="font-size:0.85em">它直接反映了市场的杠杆投机程度</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================ -->
+<!-- SECTION: Performance -->
+<!-- ============================================ -->
+<section class="section-divider">
+  <div class="num">03</div>
+  <h2>实战表现</h2>
+  <h3 style="text-align:center">信号历史 & 前瞻收益率</h3>
+</section>
+
+<!-- ============================================ -->
+<!-- SLIDE 12: Forward Returns Overview -->
+<!-- ============================================ -->
+<section>
+  <h2>📊 v2 信号前瞻收益率（全部信号）</h2>
+  <p class="small">统计方式：信号发出后次日开盘买入/做空，持有 N 天后收盘平仓 | 共 200 个历史信号</p>
+
+  <div class="metric-row fragment">
+    <div class="metric">
+      <div class="label">1 天</div>
+      <div class="num" style="color:var(--green)">+0.67%</div>
+      <div class="label">胜率 57%</div>
+    </div>
+    <div class="metric">
+      <div class="label">3 天</div>
+      <div class="num" style="color:var(--green)">+1.00%</div>
+      <div class="label">胜率 58%</div>
+    </div>
+    <div class="metric">
+      <div class="label">5 天</div>
+      <div class="num" style="color:var(--green)">+1.17%</div>
+      <div class="label">胜率 58%</div>
+    </div>
+    <div class="metric">
+      <div class="label">7 天</div>
+      <div class="num" style="color:var(--green)">+1.92%</div>
+      <div class="label">胜率 57%</div>
+    </div>
+    <div class="metric">
+      <div class="label">30 天</div>
+      <div class="num" style="color:var(--green)">+3.04%</div>
+      <div class="label">胜率 49%</div>
+    </div>
+  </div>
+
+  <div class="fragment highlight-box green" style="margin-top:16px;font-size:0.75em">
+    <strong>📈 趋势：</strong>持有时间越长，平均收益越高（1D: +0.67% → 30D: +3.04%），
+    但 30 天胜率下降到 49% — 说明长期持有的收益来自少数大赢，而非稳定盈利。
+  </div>
+</section>
+
+<!-- ============================================ -->
+<!-- SLIDE 13: Long vs Short -->
+<!-- ============================================ -->
+<section>
+  <h2>🟢 做多信号 vs 🔴 做空信号</h2>
+
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>持有期</th>
+        <th colspan="2" style="color:var(--green)">▲ 做多信号 (85个)</th>
+        <th colspan="2" style="color:var(--red)">▼ 做空信号 (109个)</th>
+      </tr>
+      <tr>
+        <th></th>
+        <th>平均收益</th><th>胜率</th>
+        <th>平均收益</th><th>胜率</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>1 天</td>
+        <td style="color:var(--green)"><strong>+1.12%</strong></td><td>61%</td>
+        <td style="color:var(--green)">+0.48%</td><td>53%</td>
+      </tr>
+      <tr>
+        <td>3 天</td>
+        <td style="color:var(--green)"><strong>+2.01%</strong></td><td style="color:var(--green)"><strong>65%</strong></td>
+        <td style="color:var(--green)">+0.33%</td><td>51%</td>
+      </tr>
+      <tr>
+        <td>5 天</td>
+        <td style="color:var(--green)"><strong>+2.44%</strong></td><td>60%</td>
+        <td style="color:var(--green)">+0.13%</td><td>55%</td>
+      </tr>
+      <tr>
+        <td>7 天</td>
+        <td style="color:var(--green)"><strong>+3.25%</strong></td><td style="color:var(--green)"><strong>61%</strong></td>
+        <td style="color:var(--green)">+0.76%</td><td>51%</td>
+      </tr>
+      <tr>
+        <td><strong>30 天</strong></td>
+        <td style="color:var(--green)"><strong>+10.71%</strong></td><td style="color:var(--green)"><strong>58%</strong></td>
+        <td style="color:var(--red)">−3.61%</td><td>42%</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="fragment highlight-box" style="margin-top:16px;font-size:0.75em">
+    <strong>💡 关键发现：</strong><br>
+    ① <strong style="color:var(--green)">做多信号远强于做空信号</strong> — 30 天平均 +10.71% vs −3.61%<br>
+    ② 做多信号 3 天胜率高达 <strong>65%</strong>，是所有组合中最高的<br>
+    ③ 做空信号效果较弱 — 可能因为 BTC 长期处于上涨趋势（幸存者偏差）
+  </div>
+</section>
+
+<!-- ============================================ -->
+<!-- SLIDE 14: v1 vs v2 Performance -->
+<!-- ============================================ -->
+<section>
+  <h2>⚡ v1 vs v2 收益对比</h2>
+
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>持有期</th>
+        <th colspan="2">v1 论文版 (200信号)</th>
+        <th colspan="2">v2 BTC适配 (200信号)</th>
+      </tr>
+      <tr>
+        <th></th><th>平均收益</th><th>胜率</th><th>平均收益</th><th>胜率</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>1 天</td>
+        <td style="color:var(--red)">−0.25%</td><td>55%</td>
+        <td style="color:var(--green)"><strong>+0.67%</strong></td><td style="color:var(--green)"><strong>57%</strong></td>
+      </tr>
+      <tr>
+        <td>3 天</td>
+        <td style="color:var(--green)">+0.25%</td><td>54%</td>
+        <td style="color:var(--green)"><strong>+1.00%</strong></td><td style="color:var(--green)"><strong>58%</strong></td>
+      </tr>
+      <tr>
+        <td>5 天</td>
+        <td style="color:var(--red)">−0.06%</td><td>50%</td>
+        <td style="color:var(--green)"><strong>+1.17%</strong></td><td style="color:var(--green)"><strong>58%</strong></td>
+      </tr>
+      <tr>
+        <td>7 天</td>
+        <td style="color:var(--green)">+0.59%</td><td>51%</td>
+        <td style="color:var(--green)"><strong>+1.92%</strong></td><td style="color:var(--green)"><strong>57%</strong></td>
+      </tr>
+      <tr>
+        <td>30 天</td>
+        <td style="color:var(--green)">+0.47%</td><td>52%</td>
+        <td style="color:var(--green)"><strong>+3.04%</strong></td><td>49%</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="fragment highlight-box green" style="margin-top:16px;font-size:0.75em">
+    <strong>✅ v2 在所有持有期的平均收益率上都优于 v1</strong> — 尤其是 1D（从 −0.25% 改善到 +0.67%）和 7D（从 +0.59% 改善到 +1.92%）。回测优化 + 资金费率噪声代理确实提升了信号质量。
+  </div>
+</section>
+
+<!-- ============================================ -->
+<!-- SLIDE 15: Backtest Stats -->
+<!-- ============================================ -->
+<section>
+  <h2>🧪 回测统计</h2>
+  <p class="small">v2 最优参数在 BTC 2017-2023 训练期 + 2024-2026 测试期上的表现</p>
+
+  <div class="two-col" style="margin-top:16px">
+    <div>
+      <h3 style="color:var(--green)">训练期 (2017-2023)</h3>
+      <div class="metric-row">
+        <div class="metric" style="flex:1">
+          <div class="label">7天命中率</div>
+          <div class="num" style="color:var(--green);font-size:1.5em">64%</div>
+        </div>
+        <div class="metric" style="flex:1">
+          <div class="label">7天 Sharpe</div>
+          <div class="num" style="color:var(--green);font-size:1.5em">1.80</div>
+        </div>
+      </div>
+      <div class="bar-wrap">
+        <div class="bar-label"><span>做多命中</span><span style="color:var(--green)">65%</span></div>
+        <div class="bar"><div class="bar-fill" style="width:65%;background:var(--green)"></div></div>
+      </div>
+      <div class="bar-wrap">
+        <div class="bar-label"><span>做空命中</span><span style="color:var(--green)">64%</span></div>
+        <div class="bar"><div class="bar-fill" style="width:64%;background:var(--blue)"></div></div>
+      </div>
+      <div class="small" style="margin-top:8px">103 个信号 (48 多 / 55 空)</div>
+    </div>
+    <div class="fragment">
+      <h3 style="color:var(--orange)">测试期 (2024-2026)</h3>
+      <div class="metric-row">
+        <div class="metric" style="flex:1">
+          <div class="label">7天命中率</div>
+          <div class="num" style="color:var(--orange);font-size:1.5em">50%</div>
+        </div>
+        <div class="metric" style="flex:1">
+          <div class="label">7天 Sharpe</div>
+          <div class="num" style="color:var(--orange);font-size:1.5em">0.01</div>
+        </div>
+      </div>
+      <div class="bar-wrap">
+        <div class="bar-label"><span>做多命中</span><span style="color:var(--orange)">40%</span></div>
+        <div class="bar"><div class="bar-fill" style="width:40%;background:var(--orange)"></div></div>
+      </div>
+      <div class="bar-wrap">
+        <div class="bar-label"><span>做空命中</span><span style="color:var(--green)">57%</span></div>
+        <div class="bar"><div class="bar-fill" style="width:57%;background:var(--blue)"></div></div>
+      </div>
+      <div class="small" style="margin-top:8px">60 个信号 (25 多 / 35 空)</div>
+    </div>
+  </div>
+
+  <div class="fragment highlight-box orange" style="margin-top:12px;font-size:0.7em">
+    <strong>⚠️ 现实检验：</strong>测试期表现明显弱于训练期（命中率从 64% 降至 50%），这说明存在一定过拟合。<strong>不要把回测当成未来收益的保证。</strong>
+  </div>
+</section>
+
+<!-- ============================================ -->
+<!-- SECTION: Usage -->
+<!-- ============================================ -->
+<section class="section-divider">
+  <div class="num">04</div>
+  <h2>使用场景</h2>
+  <h3 style="text-align:center">什么时候用？怎么用？</h3>
+</section>
+
+<!-- ============================================ -->
+<!-- SLIDE 16: When to Use -->
+<!-- ============================================ -->
+<section>
+  <h2>✅ 适合的场景</h2>
+  <div class="two-col">
+    <div>
+      <ul class="emoji-list" style="font-size:0.8em">
+        <li class="fragment">🧭 <strong>方向性过滤器</strong><br>
+          <span class="small">综合评分 > 0 → 偏向做多方向<br>综合评分 < 0 → 偏向做空方向<br>作为你现有策略的"第二意见"</span>
+        </li>
+        <li class="fragment">📏 <strong>仓位管理辅助</strong><br>
+          <span class="small">评分绝对值越大 → 信号越强 → 可以考虑加大仓位<br>评分在死区 → 轻仓/观望</span>
+        </li>
+        <li class="fragment">📡 <strong>噪声/投机热度监控</strong><br>
+          <span class="small">noise_z 高 + 资金费率极端 → 市场投机过度<br>当心短期反转（回调）</span>
+        </li>
+        <li class="fragment">📅 <strong>日线/周线级别决策</strong><br>
+          <span class="small">不是日内交易工具，适合 1-30 天的持仓周期</span>
+        </li>
+      </ul>
+    </div>
+    <div class="fragment">
+      <h2 style="color:var(--red);font-size:1.4em">❌ 不适合的场景</h2>
+      <ul class="emoji-list" style="font-size:0.8em">
+        <li>🚫 <strong>单独当交易系统</strong><br>
+          <span class="small">这是指标，不是策略<br>不包含止损、仓位管理、风控</span>
+        </li>
+        <li>🚫 <strong>短线/高频交易</strong><br>
+          <span class="small">基于日线数据，不适合分钟级操作</span>
+        </li>
+        <li>🚫 <strong>忽略风险管理</strong><br>
+          <span class="small">任何单一指标都不应该是你交易的唯一依据</span>
+        </li>
+        <li>🚫 <strong>"包赚不赔"的幻想</strong><br>
+          <span class="small">胜率约 57%，近一半时候是错的<br>必须配合风控才有意义</span>
+        </li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================ -->
+<!-- SLIDE 17: How to Use -->
+<!-- ============================================ -->
+<section>
+  <h2>🖥️ 仪表盘怎么用？</h2>
+
+  <div style="font-size:0.75em">
+    <div class="fragment">
+      <strong>Step 1：每日检查综合评分</strong>
+      <div class="highlight-box" style="padding:10px 16px;margin:6px 0">
+        打开 <a href="https://hhysteric.github.io/btc-jlst-momentum/btc.html" style="color:var(--accent)" target="_blank">仪表盘</a> → 看"综合评分"卡片 →
+        <span style="color:var(--green)">绿色 = 看多偏向</span> /
+        <span style="color:var(--red)">红色 = 看空偏向</span>
+      </div>
+    </div>
+
+    <div class="fragment">
+      <strong>Step 2：关注信号出现</strong>
+      <div class="highlight-box" style="padding:10px 16px;margin:6px 0">
+        K 线图上出现 ▲ 或 ▼ 标记 → 查看信号历史表 → 确认信号类型和评分强度
+      </div>
+    </div>
+
+    <div class="fragment">
+      <strong>Step 3：结合其他指标确认</strong>
+      <div class="highlight-box" style="padding:10px 16px;margin:6px 0">
+        JLST 做多 + 你的其他指标也看多 → 增加做多信心<br>
+        JLST 做多 + 其他指标看空 → 谨慎，可能不做或减仓
+      </div>
+    </div>
+
+    <div class="fragment">
+      <strong>Step 4：监控特殊状态</strong>
+      <div class="highlight-box orange" style="padding:10px 16px;margin:6px 0">
+        ⚠️ 相关性转正（corr > 0.20）→ 机制异常，信号可靠性下降<br>
+        ⚡ 信息冲击窗口 → 暂时不要依赖反转逻辑<br>
+        📡 噪声极高 → 当心短期剧烈回调
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================ -->
+<!-- SLIDE 18: Dashboard Features -->
+<!-- ============================================ -->
+<section>
+  <h2>🎨 仪表盘功能一览</h2>
+
+  <div class="two-col" style="font-size:0.75em">
+    <div>
+      <h3>📊 三图联动</h3>
+      <ul>
+        <li><strong>K 线图</strong> — 价格 + 买卖信号标记</li>
+        <li><strong>综合评分图</strong> — 反转/动量/AC(1) 曲线</li>
+        <li><strong>资金费率图</strong>（v2）— 多空热度直方图</li>
+        <li>三图联动十字准线 + 时间轴同步</li>
+      </ul>
+
+      <h3 style="margin-top:16px">📱 交互功能</h3>
+      <ul>
+        <li>⏱️ 日线 / 周线 / 月线切换</li>
+        <li>⛶ 全屏模式（可拖拽分割线）</li>
+        <li>🌓 深色 / 浅色主题</li>
+        <li>🌐 中文 / 英文切换</li>
+      </ul>
+    </div>
+    <div>
+      <h3>📋 信号历史表</h3>
+      <ul>
+        <li>最近 200 个信号事件</li>
+        <li>含前瞻收益率：1D / 3D / 5D / 7D / 30D</li>
+        <li>颜色编码：<span style="color:var(--green)">绿=盈利</span> / <span style="color:var(--red)">红=亏损</span></li>
+        <li>顶部汇总行：平均收益 + 胜率</li>
+      </ul>
+
+      <h3 style="margin-top:16px">🔄 数据更新</h3>
+      <ul>
+        <li>GitHub Actions 每日 UTC 01:07 自动更新</li>
+        <li>数据源：Binance BTCUSDT</li>
+        <li>资金费率：Binance Futures API + 本地缓存</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================ -->
+<!-- SECTION: Limitations -->
+<!-- ============================================ -->
+<section class="section-divider">
+  <div class="num">05</div>
+  <h2>局限性 & 总结</h2>
+  <h3 style="text-align:center">必读 ⚠️</h3>
+</section>
+
+<!-- ============================================ -->
+<!-- SLIDE 19: Limitations -->
+<!-- ============================================ -->
+<section>
+  <h2>⚠️ 局限性（必读）</h2>
+
+  <ul class="emoji-list" style="font-size:0.78em">
+    <li class="fragment">📊 <strong>横截面 ≠ 时间序列</strong><br>
+      <span class="small">论文研究的是"不同股票之间的对比"，我们是"单个 BTC 的时间序列"——统计意义不完全等价。请作为方向性参考，不是绝对真理。</span>
+    </li>
+    <li class="fragment">📉 <strong>过拟合风险</strong><br>
+      <span class="small">v2 参数通过历史数据优化，存在对训练期过拟合的可能。测试期 7D Sharpe 仅 0.01（接近随机），说明样本外衰减明显。</span>
+    </li>
+    <li class="fragment">📅 <strong>样本量短</strong><br>
+      <span class="small">仅约 9 年可靠 BTC 数据，市场结构已多次变化（纯散户 → 期货 → 机构 ETF）。所有统计估计都有较宽的置信区间。</span>
+    </li>
+    <li class="fragment">🔧 <strong>不含风险管理</strong><br>
+      <span class="small">这是一个指标/过滤器，不是完整的交易系统。没有止损、仓位管理、最大回撤控制。</span>
+    </li>
+    <li class="fragment">🧊 <strong>减半模块是叙事性的</strong><br>
+      <span class="small">历史上仅 4 次减半事件，且与宏观事件混淆。减半增强逻辑仅作视觉参考。</span>
+    </li>
+  </ul>
+</section>
+
+<!-- ============================================ -->
+<!-- SLIDE 20: Summary -->
+<!-- ============================================ -->
+<section>
+  <h2>📝 总结</h2>
+
+  <div class="two-col">
+    <div>
+      <h3>核心要点</h3>
+      <ul style="font-size:0.72em">
+        <li class="fragment"><strong>反转 + 动量 = 统一框架</strong><br><span class="small">JLST 用噪声交易理论解释了两者如何共存</span></li>
+        <li class="fragment"><strong>噪声交易是核心变量</strong><br><span class="small">BTC 散户/杠杆主导 → 反转效应比股票更强</span></li>
+        <li class="fragment"><strong>v2 适配 BTC 市场结构</strong><br><span class="small">资金费率 + 回测优化 → 信号质量提升</span></li>
+        <li class="fragment"><strong>做多信号 &gt; 做空信号</strong><br><span class="small">Long 7D: +3.25%(61%) vs Short: +0.76%(51%)</span></li>
+        <li class="fragment"><strong>用作辅助工具，不是圣杯</strong><br><span class="small">胜率 ~57%，必须结合风控和其他指标</span></li>
+      </ul>
+    </div>
+    <div class="fragment">
+      <h3>链接</h3>
+      <div style="font-size:0.72em">
+        <div class="highlight-box" style="margin-bottom:12px">
+          🖥️ <strong>仪表盘</strong><br>
+          <a href="https://hhysteric.github.io/btc-jlst-momentum/" style="color:var(--accent)" target="_blank">hhysteric.github.io/btc-jlst-momentum</a>
+        </div>
+        <div class="highlight-box" style="margin-bottom:12px">
+          📦 <strong>源代码</strong><br>
+          <a href="https://github.com/hhysteric/btc-jlst-momentum" style="color:var(--accent)" target="_blank">github.com/hhysteric/btc-jlst-momentum</a>
+        </div>
+        <div class="highlight-box">
+          📄 <strong>论文</strong><br>
+          Jegadeesh, Luo, Subrahmanyam & Titman (2025)<br>
+          <em>"Short-Term Reversals and Longer-Term Momentum around the World"</em><br>
+          Review of Financial Studies
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="small fragment" style="text-align:center;margin-top:20px">
+    ⚠️ 免责声明：仅供量化研究和教育用途，不构成投资建议。加密货币交易存在重大亏损风险。
+  </p>
+</section>
+
+</div><!-- .slides -->
+</div><!-- .reveal -->
+
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@4.6.1/dist/reveal.min.js"></script>
+<script>
+Reveal.initialize({
+  hash: true,
+  slideNumber: 'c/t',
+  width: 1200,
+  height: 700,
+  margin: 0.04,
+  transition: 'slide',
+  backgroundTransition: 'fade',
+  center: false,
+  controlsTutorial: true,
+  progress: true,
+});
+</script>
+</body>
+</html>
