@@ -562,6 +562,9 @@ let priceChartObj = null, compChartObj = null, fundChartObj = null;
 let priceSeries = null, priceVolSeries = null;
 let compSeries = null, revSeries = null, momSeries = null, ac1Series = null;
 let fundSeries = null;
+// Active chart container root — used to scope getElementById in fullscreen
+let activeChartRoot = document;
+function $id(id) { return activeChartRoot === document ? document.getElementById(id) : (activeChartRoot.querySelector('#' + id) || document.getElementById(id)); }
 
 // v1 defaults for parameter comparison
 const V1_PARAMS = {
@@ -678,14 +681,14 @@ function updatePriceLegend(o, h, l, c, vol, prevC) {
   const isUp = c >= o;
   const cls = isUp ? 'v-up' : 'v-dn';
   ['lg-o','lg-h','lg-l','lg-c'].forEach(id => {
-    const el = document.getElementById(id);
+    const el = $id(id);
     if (el) { el.className = cls; }
   });
-  const setTxt = (id, txt) => { const e = document.getElementById(id); if (e) e.textContent = txt; };
+  const setTxt = (id, txt) => { const e = $id(id); if (e) e.textContent = txt; };
   setTxt('lg-o', fmtOHLC(o)); setTxt('lg-h', fmtOHLC(h));
   setTxt('lg-l', fmtOHLC(l)); setTxt('lg-c', fmtOHLC(c));
   setTxt('lg-vol', fmtVol(vol));
-  const pctEl = document.getElementById('lg-pct');
+  const pctEl = $id('lg-pct');
   if (pctEl) {
     if (prevC != null && prevC !== 0) {
       const pct = ((c - prevC) / prevC * 100);
@@ -696,14 +699,14 @@ function updatePriceLegend(o, h, l, c, vol, prevC) {
 }
 
 function updateCompLegend(comp, rev, mom, ac1) {
-  const compEl = document.getElementById('lg-comp');
+  const compEl = $id('lg-comp');
   if (compEl) { compEl.textContent = fmtNum(comp); compEl.className = comp >= 0 ? 'v-comp-pos' : 'v-comp-neg'; }
-  const setTxt = (id, txt) => { const e = document.getElementById(id); if (e) e.textContent = txt; };
+  const setTxt = (id, txt) => { const e = $id(id); if (e) e.textContent = txt; };
   setTxt('lg-rev', fmtNum(rev)); setTxt('lg-mom', fmtNum(mom)); setTxt('lg-ac1', fmtNum(ac1));
 }
 
 function updateFundLegend(fr) {
-  const el = document.getElementById('lg-fund');
+  const el = $id('lg-fund');
   if (el) {
     if (fr != null) {
       el.textContent = fmtPct(fr);
@@ -964,6 +967,7 @@ function createFundChart(container, data) {
   // Display latest
   const latEl = document.getElementById('fundLatest');
   if (latEl) latEl.textContent = lastValid != null ? `FR: ${fmtPct(lastValid)}` : 'FR: N/A (Fetching data...)';
+  if (lastValid != null) updateFundLegend(lastValid);
 
   // Crosshair sync → price + comp
   chart.subscribeCrosshairMove(param => {
@@ -1071,6 +1075,7 @@ let fsSplitR2 = 0.67;  // bottom splitter: comp / fund within the remaining spac
 function toggleFullscreen() {
   if (isFullscreen) { exitFullscreen(); return; }
   isFullscreen = true;
+  activeChartRoot = null;
 
   fsOverlay = document.createElement('div');
   fsOverlay.className = 'charts-fullscreen';
@@ -1090,6 +1095,7 @@ function toggleFullscreen() {
       <div class="fs-fund" id="fsFundChart"></div>
     </div>`;
   document.body.appendChild(fsOverlay);
+  activeChartRoot = fsOverlay;
 
   // Clone indicator toggles
   const fsToggles = fsOverlay.querySelector('#fsIndToggles');
@@ -1195,6 +1201,7 @@ function initSplitter(splitterId, which) {
 
 function exitFullscreen() {
   isFullscreen = false;
+  activeChartRoot = document;
   if (fsOverlay) {
     ['fsSplitter1', 'fsSplitter2'].forEach(id => {
       const sp = fsOverlay.querySelector('#' + id);
