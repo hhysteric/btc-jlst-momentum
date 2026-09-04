@@ -347,6 +347,7 @@ footer a { color: var(--accent2); text-decoration: none; }
 </style>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -481,7 +482,10 @@ footer a { color: var(--accent2); text-decoration: none; }
   <div class="table-wrap">
     <div class="table-header">
       <h3>v2 Signal History</h3>
-      <span id="sigCount" style="font-size:12px;color:var(--fg2)"></span>
+      <span style="display:flex;align-items:center;gap:10px">
+        <span id="sigCount" style="font-size:12px;color:var(--fg2)"></span>
+        <button onclick="exportSignals()" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:4px 12px;font-size:12px;cursor:pointer;font-family:var(--font)">📥 Export Excel</button>
+      </span>
     </div>
     <div class="table-scroll">
       <table>
@@ -1350,6 +1354,23 @@ function updateSignalTable(data) {
   </tr>`;
 
   body.innerHTML = summaryRow + rows.join('');
+}
+
+// ── Export signals to Excel ──
+function exportSignals() {
+  const data = chartData[currentTF];
+  if (!data || !data.signals_history) return;
+  const signals = data.signals_history;
+  const header = ['Date','Type','Price','Composite','Reversal','Momentum','1D Return%','3D Return%','5D Return%','7D Return%','30D Return%'];
+  const rows = signals.map(s => [
+    s.date, s.type, s.price, s.composite, s.rev, s.mom,
+    s.fwd_1d ?? '', s.fwd_3d ?? '', s.fwd_5d ?? '', s.fwd_7d ?? '', s.fwd_30d ?? ''
+  ]);
+  const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+  ws['!cols'] = [{wch:12},{wch:8},{wch:12},{wch:10},{wch:8},{wch:8},{wch:12},{wch:12},{wch:12},{wch:12},{wch:12}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Signal History');
+  XLSX.writeFile(wb, `JLST_v2_signals_${currentTF}.xlsx`);
 }
 
 // ── Theory toggles ──

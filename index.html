@@ -337,6 +337,7 @@ footer a { color: var(--accent2); text-decoration: none; }
 </style>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -458,7 +459,10 @@ footer a { color: var(--accent2); text-decoration: none; }
   <div class="table-wrap">
     <div class="table-header">
       <h3>信号历史</h3>
-      <span id="sigCount" style="font-size:12px;color:var(--fg2)"></span>
+      <span style="display:flex;align-items:center;gap:10px">
+        <span id="sigCount" style="font-size:12px;color:var(--fg2)"></span>
+        <button onclick="exportSignals()" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:4px 12px;font-size:12px;cursor:pointer;font-family:var(--font)">📥 导出 Excel</button>
+      </span>
     </div>
     <div class="table-scroll">
       <table>
@@ -1328,6 +1332,24 @@ function updateSignalTable(data) {
   </tr>`;
 
   body.innerHTML = summaryRow + rows.join('');
+}
+
+// ── Export signals to Excel ──
+function exportSignals() {
+  const data = chartData[currentTF];
+  if (!data || !data.signals_history) return;
+  const signals = data.signals_history;
+  const header = ['日期','类型','价格','综合评分','反转','动量','1日收益%','3日收益%','5日收益%','7日收益%','30日收益%'];
+  const typeMap = {long:'做多',short:'做空',cascade:'级联'};
+  const rows = signals.map(s => [
+    s.date, typeMap[s.type]||s.type, s.price, s.composite, s.rev, s.mom,
+    s.fwd_1d ?? '', s.fwd_3d ?? '', s.fwd_5d ?? '', s.fwd_7d ?? '', s.fwd_30d ?? ''
+  ]);
+  const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+  ws['!cols'] = [{wch:12},{wch:6},{wch:12},{wch:10},{wch:8},{wch:8},{wch:10},{wch:10},{wch:10},{wch:10},{wch:10}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '信号历史');
+  XLSX.writeFile(wb, `JLST_v1_signals_${currentTF}.xlsx`);
 }
 
 // ── Theory toggles ──
