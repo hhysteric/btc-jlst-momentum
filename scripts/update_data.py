@@ -1181,7 +1181,7 @@ def compute_jlst_v2(data: dict, params: dict, funding_aligned: list) -> dict:
         "cascade": cascade[last_idx],
         "regime": regime_state[last_idx],
         "signal_state": signal_state[last_idx],
-        "funding_rate": _r(funding_aligned[last_idx], 6) if funding_aligned[last_idx] is not None else None,
+        "funding_rate": _r(next((funding_aligned[j] for j in range(last_idx, -1, -1) if funding_aligned[j] is not None), None), 6),
         "has_funding": has_funding,
     }
 
