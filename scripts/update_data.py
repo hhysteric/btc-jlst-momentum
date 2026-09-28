@@ -104,8 +104,15 @@ CASCADE_K = 3.5
 CASCADE_VOL_K = 2.5
 SMOOTH_LEN = 1
 
-# v2 funding rate endpoint (futures API — works on GitHub Actions, may be blocked locally)
-FAPI_BASE = "https://fapi.binance.com/fapi/v1"
+# v2 funding rate endpoints. Reachability differs by host and by where we run:
+#   * fapi.binance.com geo-blocks US IPs with HTTP 451 ("restricted location"),
+#     and GitHub Actions runners are US-based — so CI can never reach it.
+#   * www.binance.com/fapi/v1 serves the identical endpoint and JSON schema but
+#     is NOT geo-blocked, which is what makes the scheduled CI update work.
+#   * A local proxy covers the reverse case (dev box in China behind the GFW).
+FAPI_BASE = "https://www.binance.com/fapi/v1"
+FAPI_BASE_FALLBACK = "https://fapi.binance.com/fapi/v1"
+LOCAL_PROXY = "http://127.0.0.1:7897"
 
 # v2 noise weight allocation (with funding rate)
 V2_NOISE_W = {"atr": 0.25, "vol": 0.25, "regime": 0.20, "funding": 0.30}
@@ -259,46 +266,65 @@ def merge_data(csv_data: dict, binance_data: dict) -> dict:
     return merged
 
 
+def _probe_funding(base: str, use_proxy: bool):
+    """Probe {base}/fundingRate with limit=1.
+
+    Returns (ok, opener). Checking reachability up front means a geo-block
+    (HTTP 451) is rejected here rather than surfacing later as a confusing
+    empty result that looks like "no new funding data"."""
+    proxy_handler = None
+    if use_proxy:
+        proxy_handler = urllib.request.ProxyHandler({
+            "https": LOCAL_PROXY,
+            "http": LOCAL_PROXY,
+        })
+    opener = urllib.request.build_opener(proxy_handler) if proxy_handler else None
+
+    url = f"{base}/fundingRate?symbol=BTCUSDT&limit=1"
+    req = urllib.request.Request(url)
+    req.add_header("User-Agent", "JLST-BTC-Pipeline/2.0")
+    try:
+        if opener:
+            with opener.open(req, timeout=8) as _:
+                pass
+        else:
+            with urllib.request.urlopen(req, timeout=5) as _:
+                pass
+        return True, opener
+    except Exception as e:
+        print(f"  Funding API: {base} {'via proxy' if use_proxy else 'direct'} failed ({e})")
+        return False, None
+
+
 def fetch_funding_rate(symbol: str = "BTCUSDT") -> list:
-    """Fetch full funding rate history from Binance Futures API.
+    """Fetch full funding rate history (one record per 8h funding event).
     Returns list of {ts_ms, rate} sorted ascending.
-    Each record is one 8h funding event.
-    Tries direct connection first, then falls back to local proxy (127.0.0.1:7897)
-    for environments where fapi.binance.com is blocked by GFW."""
+
+    Tries each host, direct then via local proxy, and uses the first that
+    answers. Ordering matters: www.binance.com is the only host reachable from
+    GitHub's US runners, while fapi.binance.com is the one that works on a
+    China-based dev box once the proxy is up."""
     all_data = []
     start_time = int(datetime(2019, 9, 10, tzinfo=timezone.utc).timestamp() * 1000)  # funding starts ~2019-09
 
-    # Decide whether to use proxy: try a quick direct request first
-    proxy_handler = None
-    test_url = f"{FAPI_BASE}/fundingRate?symbol={symbol}&limit=1"
-    test_req = urllib.request.Request(test_url)
-    test_req.add_header("User-Agent", "JLST-BTC-Pipeline/2.0")
-    try:
-        with urllib.request.urlopen(test_req, timeout=5) as _:
-            pass
-        print("  Funding API: direct connection OK")
-    except Exception:
-        # Direct failed, try local proxy
-        try:
-            proxy = urllib.request.ProxyHandler({
-                "https": "http://127.0.0.1:7897",
-                "http": "http://127.0.0.1:7897",
-            })
-            opener = urllib.request.build_opener(proxy)
-            test_req2 = urllib.request.Request(test_url)
-            test_req2.add_header("User-Agent", "JLST-BTC-Pipeline/2.0")
-            with opener.open(test_req2, timeout=8) as _:
-                pass
-            proxy_handler = proxy
-            print("  Funding API: using local proxy 127.0.0.1:7897")
-        except Exception:
-            print("  Funding API: both direct and proxy failed, will use cache only")
-            return []
+    chosen_base, opener = None, None
+    for use_proxy in (False, True):
+        for base in (FAPI_BASE, FAPI_BASE_FALLBACK):
+            ok, op = _probe_funding(base, use_proxy)
+            if ok:
+                chosen_base, opener = base, op
+                print(f"  Funding API: using {base}"
+                      f"{' via proxy ' + LOCAL_PROXY if use_proxy else ' direct'}")
+                break
+        if chosen_base:
+            break
 
-    opener = urllib.request.build_opener(proxy_handler) if proxy_handler else None
+    if not chosen_base:
+        print("  Funding API: all hosts (direct + proxy) failed, will use cache only")
+        return []
 
     for _ in range(50):  # safety
-        url = f"{FAPI_BASE}/fundingRate?symbol={symbol}&limit=1000&startTime={start_time}"
+        url = f"{chosen_base}/fundingRate?symbol={symbol}&limit=1000&startTime={start_time}"
         req = urllib.request.Request(url)
         req.add_header("User-Agent", "JLST-BTC-Pipeline/2.0")
 
@@ -1353,7 +1379,20 @@ def main():
     except Exception as e:
         print(f"  [warn] Funding rate fetch failed ({e}), using cache ({len(funding_records)} records)")
 
+    # Staleness guard. The fetch above is deliberately graceful (a funding
+    # outage must not block the core price/signal update), but that is exactly
+    # how the CI geo-block went unnoticed: every run printed a warning, fell
+    # back to cache, and reported success. Surface it loudly so the symptom
+    # can't hide again.
     funding_daily = aggregate_funding_daily(funding_records) if funding_records else {}
+    funding_stale_days = None
+    if funding_records:
+        newest = max(r["ts"] for r in funding_records) / 1000
+        funding_stale_days = (time.time() - newest) / 86400
+        print(f"  Funding newest record age: {funding_stale_days:.1f} days")
+        if funding_stale_days > 3:
+            print(f"  ::warning::funding rate cache is {funding_stale_days:.1f} days stale "
+                  f"— fetch is failing, funding factor is frozen at the last good value")
     print(f"  Daily funding rate entries: {len(funding_daily)}")
 
     # Produce v2 for each timeframe
@@ -1421,6 +1460,8 @@ def main():
         "timeframes": list(TIMEFRAME_PARAMS.keys()),
         "v2_available": v2_base_params is not None,
         "funding_records": len(funding_records),
+        "funding_last_ts": max((r["ts"] for r in funding_records), default=None),
+        "funding_stale_days": round(funding_stale_days, 2) if funding_stale_days is not None else None,
     }
     with open(data_dir / "meta.json", "w", encoding="utf-8") as f:
         json.dump(meta, f, indent=2, ensure_ascii=False)

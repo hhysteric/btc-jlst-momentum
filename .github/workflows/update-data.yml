@@ -31,3 +31,21 @@ jobs:
           git add data/
           git diff --staged --quiet || git commit -m "Update JLST data $(date -u +%Y-%m-%d)"
           git push
+
+      # Guard LAST, after the data has landed. The funding fetch degrades
+      # gracefully (a feed outage must not block price/signal updates), which
+      # is how a geo-blocked endpoint went unnoticed for 26 days. Fail the run
+      # here so the red X surfaces it — without withholding the data.
+      - name: Verify funding rate feed is fresh
+        if: always()
+        run: |
+          python - <<'PY'
+          import json, sys
+          meta = json.load(open("data/meta.json"))
+          stale, last = meta.get("funding_stale_days"), meta.get("funding_last_ts")
+          print(f"funding_last_ts={last}  stale_days={stale}")
+          if stale is None:
+              sys.exit("funding feed has no usable records at all")
+          if stale > 3:
+              sys.exit(f"funding feed is {stale:.1f} days stale - check the endpoint")
+          PY
