@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-07T05:48:53.322428+00:00",
+  "generated_at": "2026-10-08T05:54:01.021945+00:00",
   "source": "Binance BTCUSDT",
   "model": "JLST Reversal-Momentum Composite (BTC Specialized)",
   "paper": "Jegadeesh, Luo, Subrahmanyam & Titman (2025, RFS)",
@@ -9,7 +9,7 @@
     "monthly"
   ],
   "v2_available": true,
-  "funding_records": 7752,
-  "funding_last_ts": 1791331200002,
-  "funding_stale_days": 0.24
+  "funding_records": 7755,
+  "funding_last_ts": 1791417600000,
+  "funding_stale_days": 0.25
 }
